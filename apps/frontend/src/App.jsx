@@ -73,8 +73,8 @@ export default function App() {
   // FUNGSI PINTAR UNTUK KATEGORI OTOMATIS
   const getKategoriOtomatis = (tx) => {
     if (tx.kategori?.nama) return tx.kategori.nama;
-    if (tx.keterangan?.toLowerCase().includes('paid promote')) return 'Paid Promote (Auto)';
-    if (tx.keterangan?.toLowerCase().includes('proposal')) return 'Proposal (Auto)';
+    if (tx.keterangan?.toLowerCase().includes('paid promote')) return 'Paid Promote';
+    if (tx.keterangan?.toLowerCase().includes('proposal')) return 'Proposal';
     return '-';
   };
 
