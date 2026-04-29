@@ -5,6 +5,9 @@
   "workspaces": [
     "apps/*"
   ],
+  "scripts": {
+    "dev": "bunx concurrently -c \"cyan.bold,green.bold\" -n \"BACKEND,FRONTEND\" \"cd apps/backend && bun run --watch src/index.ts\" \"cd apps/frontend && bun run dev\""
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
