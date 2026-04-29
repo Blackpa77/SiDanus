@@ -26,6 +26,7 @@ export default function App() {
   const [stats, setStats] = useState({ total_kredit: 0, total_debit: 0, saldo_saat_ini: 0 });
   const [transaksi, setTransaksi] = useState([]);
   const [picList, setPicList] = useState([]); 
+  const [namaPjBaru, setNamaPjBaru] = useState('');
   const [paidPromotes, setPaidPromotes] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [waktuLive, setWaktuLive] = useState(new Date());
