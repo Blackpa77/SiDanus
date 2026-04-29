@@ -64,14 +64,25 @@ function App() {
   };
 
   // ==== HANDLER PENGATURAN ====
-  const handleTambahPj = (e) => {
+const handleTambahPj = async (e) => {
     e.preventDefault();
-    // Tampilkan notifikasi sukses di dalam kotak PJ
-    setNotifPj(`PJ "${namaPjBaru}" siap ditambahkan! (Menunggu integrasi API)`);
-    setNamaPjBaru('');
-    setTimeout(() => setNotifPj(''), 4000); // Hilang otomatis setelah 4 detik
-  };
+    try {
+      const response = await fetch('http://localhost:3000/api/pic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nama: namaPjBaru })
+      });
 
+      if (response.ok) {
+        setNotifPj(`PJ "${namaPjBaru}" sukses tersimpan di database!`);
+        setNamaPjBaru('');
+        setTimeout(() => setNotifPj(''), 4000);
+      }
+    } catch (error) {
+      setNotifPj('Gagal nyimpan PJ baru, cek koneksi backend!');
+      setTimeout(() => setNotifPj(''), 4000);
+    }
+  };
   const handleUpdateCreds = (e) => {
     e.preventDefault();
     setCredentials(inputGantiCreds);

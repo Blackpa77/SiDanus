@@ -27,10 +27,23 @@ export default function FormTransaksi() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Data siap dikirim:", formData);
-    alert("Tombol simpan ditekan (Integrasi API menyusul)");
+    try {
+      const response = await fetch('http://localhost:3000/api/transaksi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      
+      if (response.ok) {
+        alert("Mantap! Transaksi berhasil disimpan ke Supabase.");
+        window.location.reload(); // Refresh halaman biar saldonya langsung update
+      }
+    } catch (error) {
+      console.error("Gagal nyimpan:", error);
+      alert("Gagal nyambung ke database bro!");
+    }
   };
 
   return (
