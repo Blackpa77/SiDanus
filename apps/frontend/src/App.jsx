@@ -47,13 +47,11 @@ export default function App() {
 
   const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   
-  // Format Tanggal dari Database (YYYY-MM-DDTHH:MM...)
   const formatTanggalDB = (isoString) => {
     if (!isoString) return '-';
     return new Date(isoString).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  // HANDLER LOGIN
   const handleLogin = (e) => {
     e.preventDefault();
     if (inputLogin.username === credentials.username && inputLogin.password === credentials.password) {
@@ -64,21 +62,19 @@ export default function App() {
     if(window.confirm('Yakin mau keluar?')) { setIsLoggedIn(false); localStorage.removeItem('isLoggedIn'); setActiveMenu('dashboard'); }
   };
 
-  // HANDLER EXPORT
   const exportExcel = () => {
     const headers = ['Tanggal', 'Tipe', 'Kategori', 'PJ', 'Keterangan', 'Nominal'];
     const rows = [headers.join(',')];
     transaksi.forEach(t => {
-      // Perhatikan relasinya sekarang dipanggil dengan 't.pj?.nama'
       rows.push([t.tanggal.split('T')[0], t.tipe, t.kategori?.nama, t.pj?.nama, `"${t.keterangan || ''}"`, t.nominal].join(','));
     });
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'Riwayat_SiDanus.csv'; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = 'Laporan_Keuangan_KWU.csv'; a.click();
   };
+  
   const exportPDF = () => window.print();
 
-  // HANDLER CRUD
   const handleHapusTx = async (id) => {
     if(window.confirm('Yakin ingin menghapus transaksi ini?')) {
       await fetch(`http://localhost:3000/api/transaksi/${id}`, { method: 'DELETE' });
@@ -127,7 +123,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans text-gray-800">
+    <div className="flex h-screen bg-gray-50 font-sans text-gray-800 print:bg-white print:h-auto">
       <aside className={`w-64 text-white flex flex-col shadow-xl z-10 print:hidden ${activeTheme.bgSide} transition-colors duration-500`}>
         <div className={`h-20 flex items-center justify-center border-b ${activeTheme.border}`}>
           <h1 className="text-2xl font-bold tracking-wider">Si<span className={activeTheme.textAccent}>Danus</span></h1>
@@ -140,7 +136,7 @@ export default function App() {
         <div className={`p-4 border-t ${activeTheme.border}`}><button onClick={handleLogout} className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-lg">Logout</button></div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto print:overflow-visible print:w-full">
         <header className="bg-white shadow-sm h-20 flex items-center px-8 sticky top-0 z-10 print:hidden">
           <h2 className="text-xl font-bold text-gray-700 uppercase">{activeMenu} INFEST</h2>
         </header>
@@ -163,35 +159,56 @@ export default function App() {
 
           {/* VIEW TRANSPARANSI */}
           {activeMenu === 'transparansi' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:block print:w-full">
+              
               <div className="lg:col-span-1 print:hidden">
                 <FormTransaksi theme={activeTheme} editData={editTxData} onCancelEdit={() => setEditTxData(null)}
                    onSuccess={(aksi) => { setNotifTable(`Transaksi berhasil ${aksi}!`); setEditTxData(null); loadData(); setTimeout(()=>setNotifTable(''),3000); }} 
                 />
               </div>
-              <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex flex-col">
+
+              <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex flex-col print:shadow-none print:border-0 print:m-0 print:p-0 print:block">
+                
                 <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center print:hidden">
                   <h4 className="font-bold text-gray-700">Riwayat Transaksi</h4>
                   <div className="flex gap-2">
-                    <button onClick={exportPDF} className="bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold py-2 px-4 rounded-lg">PDF</button>
-                    <button onClick={exportExcel} className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg">Excel</button>
+                    <button onClick={exportPDF} className="bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold py-2 px-4 rounded-lg">Ekspor PDF</button>
+                    <button onClick={exportExcel} className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg">Ekspor Excel</button>
                   </div>
                 </div>
                 {notifTable && <div className="p-3 bg-blue-50 text-blue-700 text-center text-sm font-bold print:hidden">{notifTable}</div>}
-                <div className="flex-1 p-4 overflow-x-auto">
-                  <table className="w-full text-sm text-left text-gray-600">
-                    <thead className="text-xs text-gray-700 uppercase bg-gray-100">
-                      <tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Keterangan</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3">PJ</th><th className="px-4 py-3">Nominal</th><th className="px-4 py-3 text-center print:hidden">Aksi</th></tr>
+
+                {/* --- KOP SURAT KHUSUS PRINT PDF --- */}
+                <div className="hidden print:block text-center pt-4 pb-6 w-full">
+                  <h2 className="text-2xl font-extrabold text-gray-900 uppercase tracking-widest">Laporan Transparansi Dana</h2>
+                  <h3 className="text-lg font-bold text-gray-700 uppercase">Divisi Kewirausahaan (KWU) - INFEST 2026</h3>
+                  <p className="text-sm text-gray-500 mt-1">Dicetak pada: {formatTanggalDB(new Date().toISOString())} | Waktu: {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB</p>
+                  <div className="border-b-4 border-gray-900 w-full mt-4 mb-1"></div>
+                  <div className="border-b-2 border-gray-900 w-full mb-6"></div>
+                </div>
+
+                <div className="flex-1 p-4 print:p-0 overflow-x-auto print:overflow-visible">
+                  {/* Tambahan class print:border-collapse dan print:border untuk merapikan tabel saat dicetak */}
+                  <table className="w-full text-sm text-left text-gray-600 print:border-collapse print:w-full print:border print:border-gray-800">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-100 print:bg-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 print:border print:border-gray-800">Tanggal</th>
+                        <th className="px-4 py-3 print:border print:border-gray-800">Keterangan</th>
+                        <th className="px-4 py-3 print:border print:border-gray-800">Kategori</th>
+                        <th className="px-4 py-3 print:border print:border-gray-800">PJ</th>
+                        <th className="px-4 py-3 print:border print:border-gray-800 text-right">Nominal</th>
+                        <th className="px-4 py-3 text-center print:hidden">Aksi</th>
+                      </tr>
                     </thead>
                     <tbody>
-                      {transaksi.length === 0 ? ( <tr><td colSpan="6" className="text-center py-8">Belum ada transaksi</td></tr> ) : (
+                      {transaksi.length === 0 ? ( <tr><td colSpan="6" className="text-center py-8 print:border print:border-gray-800">Belum ada transaksi</td></tr> ) : (
                         transaksi.map((tx) => (
-                          <tr key={tx.id} className="border-b hover:bg-gray-50">
-                            <td className="px-4 py-3 whitespace-nowrap">{formatTanggalDB(tx.tanggal)}</td>
-                            <td className="px-4 py-3 font-medium text-gray-800">{tx.keterangan || '-'}</td>
-                            <td className="px-4 py-3">{tx.kategori?.nama}</td>
-                            <td className="px-4 py-3">{tx.pj?.nama}</td>
-                            <td className={`px-4 py-3 font-bold whitespace-nowrap ${tx.tipe === 'KREDIT' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          <tr key={tx.id} className="border-b hover:bg-gray-50 print:border-b print:border-gray-800">
+                            <td className="px-4 py-3 whitespace-nowrap print:border print:border-gray-800">{formatTanggalDB(tx.tanggal)}</td>
+                            <td className="px-4 py-3 font-medium text-gray-800 print:border print:border-gray-800">{tx.keterangan || '-'}</td>
+                            <td className="px-4 py-3 print:border print:border-gray-800">{tx.kategori?.nama}</td>
+                            <td className="px-4 py-3 print:border print:border-gray-800">{tx.pj?.nama}</td>
+                            <td className={`px-4 py-3 font-bold whitespace-nowrap text-right print:border print:border-gray-800 ${tx.tipe === 'KREDIT' ? 'text-emerald-600 print:text-gray-900' : 'text-rose-600 print:text-gray-900'}`}>
                               {tx.tipe === 'KREDIT' ? '+' : '-'}{formatRupiah(tx.nominal)}
                             </td>
                             <td className="px-4 py-3 text-center print:hidden whitespace-nowrap">
@@ -202,18 +219,32 @@ export default function App() {
                         ))
                       )}
                     </tbody>
+                    
+                    {/* Ringkasan Saldo di bagian bawah PDF */}
+                    <tfoot className="hidden print:table-footer-group font-bold text-gray-900 bg-gray-100">
+                      <tr>
+                        <td colSpan="4" className="px-4 py-3 text-right print:border print:border-gray-800">TOTAL PEMASUKAN</td>
+                        <td className="px-4 py-3 text-right print:border print:border-gray-800">{formatRupiah(stats.total_kredit)}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan="4" className="px-4 py-3 text-right print:border print:border-gray-800">TOTAL PENGELUARAN</td>
+                        <td className="px-4 py-3 text-right print:border print:border-gray-800">{formatRupiah(stats.total_debit)}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan="4" className="px-4 py-3 text-right print:border print:border-gray-800 uppercase">Saldo Akhir</td>
+                        <td className="px-4 py-3 text-right print:border print:border-gray-800 text-lg">{formatRupiah(stats.saldo_saat_ini)}</td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
             </div>
           )}
 
-          {/* VIEW PENGATURAN (SUDAH KEMBALI LENGKAP!) */}
+          {/* VIEW PENGATURAN */}
           {activeMenu === 'pengaturan' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:hidden">
-              
               <div className="space-y-6">
-                {/* SETTING TEMA */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                   <h3 className="text-lg font-bold text-gray-700 mb-4">Personalisasi Tema Aplikasi</h3>
                   <div className="flex gap-4">
@@ -225,8 +256,6 @@ export default function App() {
                     ))}
                   </div>
                 </div>
-
-                {/* SETTING KREDENSIAL LOGIN */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                   <h3 className="text-lg font-bold text-gray-700 mb-2">Kredensial Login</h3>
                   <p className="text-sm text-gray-500 mb-4">Ubah username dan password untuk mengakses SiDanus.</p>
@@ -238,8 +267,6 @@ export default function App() {
                   </form>
                 </div>
               </div>
-
-              {/* SETTING MANAJEMEN PJ */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
                 <h3 className="text-lg font-bold text-gray-700 mb-2">Manajemen Penanggung Jawab (PJ)</h3>
                 <p className="text-sm text-gray-500 mb-4">Tambahkan atau hapus nama PJ.</p>
@@ -248,7 +275,6 @@ export default function App() {
                   <input type="text" value={namaPjBaru} onChange={(e) => setNamaPjBaru(e.target.value)} placeholder="Nama PJ (cth: Dika)" required className={`flex-1 border-gray-300 rounded-lg p-3 border ${activeTheme.ring}`} />
                   <button type="submit" className={`text-white font-bold py-3 px-6 rounded-lg ${activeTheme.btn}`}>Tambah</button>
                 </form>
-
                 <div className="border-t pt-4">
                   <h4 className="text-sm font-bold text-gray-600 mb-3">Daftar PJ Aktif:</h4>
                   <ul className="space-y-2 max-h-60 overflow-y-auto">
@@ -261,10 +287,8 @@ export default function App() {
                   </ul>
                 </div>
               </div>
-
             </div>
           )}
-
         </div>
       </main>
     </div>
