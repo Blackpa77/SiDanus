@@ -27,7 +27,6 @@ const app = new Elysia()
   // ==== PAID PROMOTE ====
   .get("/api/paid-promote", async () => await prisma.paidPromote.findMany({ orderBy: { id: 'desc' } }))
   .post("/api/paid-promote", async ({ body }: { body: any }) => {
-    // Otomatis bikin pemasukan di Transparansi
     const tx = await prisma.transaksi.create({ data: { tanggal: new Date(body.tanggal_mulai), tipe: 'KREDIT', nominal: parseFloat(body.harga), keterangan: `Pendapatan Paid Promote: ${body.nama_pemesan}` } });
     const pp = await prisma.paidPromote.create({ data: { nama_pemesan: body.nama_pemesan, tanggal_mulai: new Date(body.tanggal_mulai), tanggal_selesai: new Date(body.tanggal_selesai), harga: parseFloat(body.harga), status: "Aktif", transaksi_id: tx.id } });
     return { success: true, data: pp };
@@ -35,11 +34,27 @@ const app = new Elysia()
   .put("/api/paid-promote/:id/batal", async ({ params }) => {
     const pp = await prisma.paidPromote.findUnique({ where: { id: parseInt(params.id) } });
     if (pp?.transaksi_id) {
-      await prisma.transaksi.delete({ where: { id: pp.transaksi_id } }).catch(()=>null); // Hapus saldo transparansi
+      await prisma.transaksi.delete({ where: { id: pp.transaksi_id } }).catch(()=>null);
       await prisma.paidPromote.update({ where: { id: parseInt(params.id) }, data: { status: "Dibatalkan", transaksi_id: null } });
     }
     return { success: true };
   })
+  // EDIT PP
+  .put("/api/paid-promote/:id", async ({ params, body }: { params: any, body: any }) => {
+    const pp = await prisma.paidPromote.update({ where: { id: parseInt(params.id) }, data: { nama_pemesan: body.nama_pemesan, tanggal_mulai: new Date(body.tanggal_mulai), tanggal_selesai: new Date(body.tanggal_selesai), harga: parseFloat(body.harga) } });
+    if(pp.transaksi_id) {
+      await prisma.transaksi.update({ where: { id: pp.transaksi_id }, data: { tanggal: new Date(body.tanggal_mulai), nominal: parseFloat(body.harga), keterangan: `Pendapatan Paid Promote: ${body.nama_pemesan}` } }).catch(()=>null);
+    }
+    return { success: true, data: pp };
+  })
+  // HAPUS PP
+  .delete("/api/paid-promote/:id", async ({ params }) => {
+    const pp = await prisma.paidPromote.findUnique({ where: { id: parseInt(params.id) } });
+    if (pp?.transaksi_id) await prisma.transaksi.delete({ where: { id: pp.transaksi_id } }).catch(()=>null);
+    await prisma.paidPromote.delete({ where: { id: parseInt(params.id) } });
+    return { success: true };
+  })
+
 
   // ==== PROPOSAL ====
   .get("/api/proposal", async () => await prisma.proposal.findMany({ orderBy: { id: 'desc' } }))
@@ -48,16 +63,29 @@ const app = new Elysia()
     const current = await prisma.proposal.findUnique({ where: { id: parseInt(params.id) } });
     let txId = current?.transaksi_id;
 
-    // Jika diupdate jadi 'Dicairkan', tembak uangnya ke Transparansi
     if (body.status === 'Dicairkan' && body.nominal_cair && !txId) {
         const tx = await prisma.transaksi.create({ data: { tanggal: new Date(), tipe: 'KREDIT', nominal: parseFloat(body.nominal_cair), keterangan: `Pencairan Proposal: ${body.instansi}` } });
         txId = tx.id;
     }
-
     const prop = await prisma.proposal.update({ where: { id: parseInt(params.id) }, data: { status: body.status, nominal_cair: body.nominal_cair ? parseFloat(body.nominal_cair) : null, transaksi_id: txId } });
     return { success: true, data: prop };
+  })
+  // EDIT PROPOSAL
+  .put("/api/proposal/:id/edit", async ({ params, body }: { params: any, body: any }) => {
+    const prop = await prisma.proposal.update({ where: { id: parseInt(params.id) }, data: { pj_pengantar: body.pj_pengantar, instansi: body.instansi } });
+    if (prop.transaksi_id) {
+      await prisma.transaksi.update({ where: { id: prop.transaksi_id }, data: { keterangan: `Pencairan Proposal: ${body.instansi}` } }).catch(()=>null);
+    }
+    return { success: true };
+  })
+  // HAPUS PROPOSAL
+  .delete("/api/proposal/:id", async ({ params }) => {
+    const prop = await prisma.proposal.findUnique({ where: { id: parseInt(params.id) } });
+    if (prop?.transaksi_id) await prisma.transaksi.delete({ where: { id: prop.transaksi_id } }).catch(()=>null);
+    await prisma.proposal.delete({ where: { id: parseInt(params.id) } });
+    return { success: true };
   })
 
   .listen(3000);
 
-console.log(`🦊 Backend SiDanus V3 (Progja Danus) Jalan!`);
+console.log(`🦊 Backend SiDanus V4 (Full CRUD) Jalan!`);
