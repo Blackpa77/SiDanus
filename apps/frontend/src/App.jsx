@@ -3,10 +3,7 @@ import FormTransaksi from './components/FormTransaksi';
 
 function App() {
   // ==== STATE LOGIN & KREDENSIAL ====
-  // Mengecek apakah sebelumnya sudah login atau belum
   const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('isLoggedIn') === 'true');
-  
-  // Mengambil kredensial dari localStorage, kalau kosong pakai default dari kamu
   const [credentials, setCredentials] = useState(() => {
     const saved = localStorage.getItem('sidanus_creds');
     return saved ? JSON.parse(saved) : { username: 'danus123', password: 'danus123' };
@@ -15,13 +12,17 @@ function App() {
   const [inputLogin, setInputLogin] = useState({ username: '', password: '' });
   const [inputGantiCreds, setInputGantiCreds] = useState({ username: credentials.username, password: credentials.password });
 
+  // ==== STATE NOTIFIKASI DALAM KOTAK (PENGGANTI ALERT) ====
+  const [loginError, setLoginError] = useState('');
+  const [notifCreds, setNotifCreds] = useState('');
+  const [notifPj, setNotifPj] = useState('');
+
   // ==== STATE APLIKASI ====
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [stats, setStats] = useState({ total_kredit: 0, total_debit: 0, saldo_saat_ini: 0 });
   const [transaksi, setTransaksi] = useState([]);
   const [namaPjBaru, setNamaPjBaru] = useState('');
 
-  // Tarik data dari backend HANYA kalau sudah login
   useEffect(() => {
     if (isLoggedIn) {
       fetch('http://localhost:3000/api/stats')
@@ -40,14 +41,16 @@ function App() {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   };
 
-  // ==== HANDLER LOGIN & LOGOUT ====
+  // ==== HANDLER LOGIN ====
   const handleLogin = (e) => {
     e.preventDefault();
     if (inputLogin.username === credentials.username && inputLogin.password === credentials.password) {
+      setLoginError('');
       setIsLoggedIn(true);
       localStorage.setItem('isLoggedIn', 'true');
     } else {
-      alert('Username atau Password salah bro!');
+      // Tampilkan error di dalam kotak login
+      setLoginError('Username atau Password salah bro!');
     }
   };
 
@@ -56,25 +59,30 @@ function App() {
       setIsLoggedIn(false);
       localStorage.removeItem('isLoggedIn');
       setActiveMenu('dashboard');
+      setLoginError(''); // Reset pesan error
     }
   };
 
   // ==== HANDLER PENGATURAN ====
   const handleTambahPj = (e) => {
     e.preventDefault();
-    alert(`Panitia "${namaPjBaru}" siap ditambahkan ke database! (Integrasi API menyusul)`);
+    // Tampilkan notifikasi sukses di dalam kotak PJ
+    setNotifPj(`PJ "${namaPjBaru}" siap ditambahkan! (Menunggu integrasi API)`);
     setNamaPjBaru('');
+    setTimeout(() => setNotifPj(''), 4000); // Hilang otomatis setelah 4 detik
   };
 
   const handleUpdateCreds = (e) => {
     e.preventDefault();
     setCredentials(inputGantiCreds);
     localStorage.setItem('sidanus_creds', JSON.stringify(inputGantiCreds));
-    alert('Mantap! Username dan Password berhasil diubah.');
+    // Tampilkan notifikasi sukses di dalam kotak Kredensial
+    setNotifCreds('Mantap! Username & Password berhasil diubah.');
+    setTimeout(() => setNotifCreds(''), 4000); // Hilang otomatis setelah 4 detik
   };
 
   // ==========================================
-  // VIEW 1: HALAMAN LOGIN (Kalau Belum Login)
+  // VIEW 1: HALAMAN LOGIN
   // ==========================================
   if (!isLoggedIn) {
     return (
@@ -84,6 +92,14 @@ function App() {
             <h1 className="text-4xl font-bold text-gray-800 tracking-wider mb-2">Si<span className="text-emerald-500">Danus</span></h1>
             <p className="text-gray-500 font-medium">Portal Keuangan INFEST</p>
           </div>
+
+          {/* Kotak Pesan Error Login */}
+          {loginError && (
+            <div className="mb-6 p-4 bg-rose-50 border-l-4 border-rose-500 text-rose-700 rounded-r-lg text-sm font-semibold text-center">
+              {loginError}
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Username</label>
@@ -115,12 +131,12 @@ function App() {
   }
 
   // ==========================================
-  // VIEW 2: HALAMAN UTAMA (Kalau Sudah Login)
+  // VIEW 2: HALAMAN UTAMA (Sudah Login)
   // ==========================================
   return (
     <div className="flex h-screen bg-green-50 font-sans text-gray-800">
       
-      
+      {/* Sidebar Kiri */}
       <aside className="w-64 bg-emerald-800 text-white flex flex-col shadow-xl z-10">
         <div className="h-20 flex items-center justify-center border-b border-emerald-700">
           <h1 className="text-2xl font-bold tracking-wider">Si<span className="text-emerald-300">Danus</span></h1>
@@ -130,8 +146,6 @@ function App() {
           <button onClick={() => setActiveMenu('transparansi')} className={`w-full text-left px-4 py-3 rounded-lg font-semibold transition ${activeMenu === 'transparansi' ? 'bg-emerald-700 shadow-sm' : 'hover:bg-emerald-700/50'}`}>Transparansi</button>
           <button onClick={() => setActiveMenu('pengaturan')} className={`w-full text-left px-4 py-3 rounded-lg font-semibold transition ${activeMenu === 'pengaturan' ? 'bg-emerald-700 shadow-sm' : 'hover:bg-emerald-700/50'}`}>Pengaturan</button>
         </nav>
-        
-        
         <div className="p-4 border-t border-emerald-700">
           <button onClick={handleLogout} className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-lg transition shadow-sm">
             Keluar (Logout)
@@ -139,7 +153,7 @@ function App() {
         </div>
       </aside>
 
-      
+      {/* Konten Utama */}
       <main className="flex-1 overflow-y-auto">
         <header className="bg-white shadow-sm h-20 flex items-center justify-between px-8 sticky top-0 z-10">
           <h2 className="text-xl font-bold text-gray-700 uppercase tracking-wide">
@@ -155,7 +169,7 @@ function App() {
 
         <div className="p-8">
           
-          
+          {/* TAMPILAN: DASHBOARD */}
           {activeMenu === 'dashboard' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -183,11 +197,11 @@ function App() {
             </div>
           )}
 
-          
+          {/* TAMPILAN: TRANSPARANSI */}
           {activeMenu === 'transparansi' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
-                <FormTransaksi/>
+                <FormTransaksi />
               </div>
               <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex flex-col">
                 <div className="px-6 py-4 border-b bg-gray-50">
@@ -200,15 +214,21 @@ function App() {
             </div>
           )}
 
-          
+          {/* TAMPILAN: PENGATURAN */}
           {activeMenu === 'pengaturan' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              
+              {/* Card 1: Ganti Password */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="text-lg font-bold text-gray-700 mb-2">Kredensial Login</h3>
-                <p className="text-sm text-gray-500 mb-6">Ubah username dan password untuk mengakses SiDanus.</p>
+                <p className="text-sm text-gray-500 mb-4">Ubah username dan password untuk mengakses SiDanus.</p>
                 
+                {notifCreds && (
+                  <div className="mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-700 text-sm font-semibold">
+                    {notifCreds}
+                  </div>
+                )}
+
                 <form onSubmit={handleUpdateCreds} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">Username Baru</label>
@@ -236,22 +256,28 @@ function App() {
                 </form>
               </div>
 
-              
+              {/* Card 2: Tambah PJ */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
-                <h3 className="text-lg font-bold text-gray-700 mb-2">Manajemen PIC</h3>
-                <p className="text-sm text-gray-500 mb-6">Tambahkan nama panitia baru ke dalam sistem.</p>
+                <h3 className="text-lg font-bold text-gray-700 mb-2">Manajemen Penanggung Jawab (PJ)</h3>
+                <p className="text-sm text-gray-500 mb-4">Tambahkan nama penanggung jawab baru ke dalam sistem.</p>
                 
+                {notifPj && (
+                  <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-500 text-blue-700 text-sm font-semibold">
+                    {notifPj}
+                  </div>
+                )}
+
                 <form onSubmit={handleTambahPj} className="flex flex-col gap-4">
                   <input 
                     type="text" 
                     value={namaPjBaru}
                     onChange={(e) => setNamaPjBaru(e.target.value)}
-                    placeholder="Masukkan nama panitia (contoh: Dika)" 
+                    placeholder="Masukkan nama PJ (contoh: Dika)" 
                     required
                     className="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 border"
                   />
                   <button type="submit" className="bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-emerald-700 transition">
-                    Tambah Panitia
+                    Tambah PJ
                   </button>
                 </form>
               </div>
