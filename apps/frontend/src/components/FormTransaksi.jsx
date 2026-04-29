@@ -1,113 +1,113 @@
 import { useState, useEffect } from 'react';
 
-export default function FormTransaksi({ onSuccess, editData, onCancelEdit, theme }) {
-  const [kategoriList, setKategoriList] = useState([]);
-  const [picList, setPicList] = useState([]);
-  
-  const defaultForm = {
+export default function FormTransaksi({ theme, editData, onCancelEdit, onSuccess, picList, kategoriList }) {
+  const [form, setForm] = useState({
     tanggal: new Date().toISOString().split('T')[0],
-    nominal: '', keterangan: '', id_kategori: '', id_pj: '', tipe: 'KREDIT', bukti_url: ''
-  };
-
-  const [formData, setFormData] = useState(defaultForm);
-  const [fileBukti, setFileBukti] = useState(null);
-
-  useEffect(() => {
-    fetch('http://localhost:3000/api/kategori').then(res => res.json()).then(data => setKategoriList(data));
-    fetch('http://localhost:3000/api/pic').then(res => res.json()).then(data => setPicList(data));
-  }, []);
+    tipe: 'KREDIT',
+    nominal: '',
+    id_kategori: '',
+    id_pj: '',
+    keterangan: '',
+    bukti_url: ''
+  });
 
   useEffect(() => {
     if (editData) {
-      setFormData({
-        tanggal: editData.tanggal ? editData.tanggal.split('T')[0] : defaultForm.tanggal,
-        nominal: editData.nominal,
-        keterangan: editData.keterangan || '',
-        id_kategori: editData.id_kategori,
-        id_pj: editData.id_pj,
+      setForm({
+        tanggal: editData.tanggal ? editData.tanggal.split('T')[0] : '',
         tipe: editData.tipe,
+        nominal: editData.nominal,
+        id_kategori: editData.id_kategori || '',
+        id_pj: editData.id_pj || '',
+        keterangan: editData.keterangan || '',
         bukti_url: editData.bukti_url || ''
       });
     } else {
-      setFormData(defaultForm);
+      setForm({
+        tanggal: new Date().toISOString().split('T')[0],
+        tipe: 'KREDIT',
+        nominal: '',
+        id_kategori: '',
+        id_pj: '',
+        keterangan: '',
+        bukti_url: ''
+      });
     }
   }, [editData]);
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 1048576) {
-        alert("Waduh, ukuran gambar kebesaran wok! Maksimal 1 MB ya.");
-        e.target.value = ''; setFileBukti(null); return;
-      }
-      setFileBukti(file);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      const url = editData ? `http://localhost:3000/api/transaksi/${editData.id}` : 'http://localhost:3000/api/transaksi';
-      const method = editData ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData)
-      });
-      
-      if (response.ok) {
-        setFormData(defaultForm); setFileBukti(null); document.getElementById('fileInput').value = ''; 
-        if (onSuccess) onSuccess(editData ? 'diedit' : 'disimpan');
-      }
-    } catch (error) { alert("Gagal nyambung ke database bro!"); }
+    const url = editData ? `http://localhost:3000/api/transaksi/${editData.id}` : 'http://localhost:3000/api/transaksi';
+    const method = editData ? 'PUT' : 'POST';
+    
+    await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form)
+    });
+    onSuccess(editData ? 'diupdate' : 'disimpan');
   };
 
   return (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-bold text-gray-700">{editData ? 'Edit Transaksi' : 'Input Transaksi Baru'}</h3>
-        {editData && <button onClick={onCancelEdit} className="text-rose-500 text-sm font-bold">Batal Edit</button>}
-      </div>
-      
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+      <h3 className="text-lg font-bold text-gray-700 mb-4">{editData ? 'Edit Transaksi' : 'Input Transaksi Baru'}</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* FIELD ID TRANSAKSI OTOMATIS */}
         <div className="flex gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-600 mb-1">ID Transaksi</label>
-            <input type="text" disabled value={editData ? `TRX-${editData.id.toString().padStart(4, '0')}` : 'TRX-AUTO'} className="w-full bg-gray-100 text-gray-500 border-gray-300 rounded-lg shadow-sm p-2 border font-mono font-bold cursor-not-allowed" />
-          </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-600 mb-1">Tanggal</label>
-            <input type="date" name="tanggal" value={formData.tanggal} onChange={handleChange} required className={`w-full border-gray-300 rounded-lg shadow-sm p-2 border ${theme.ring}`} />
-          </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">ID Transaksi</label>
+              <input type="text" value={editData ? `TRX-${editData.id.toString().padStart(4, '0')}` : 'TRX-AUTO'} disabled className="w-full bg-gray-100 p-2 border rounded-lg text-gray-500 font-mono text-sm" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">Tanggal</label>
+              <input type="date" value={form.tanggal} onChange={(e) => setForm({...form, tanggal: e.target.value})} required className={`w-full p-2 border rounded-lg ${theme.ring}`} />
+            </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Tipe</label>
-            <select name="tipe" value={formData.tipe} onChange={handleChange} className={`w-full border-gray-300 rounded-lg shadow-sm p-2 border ${theme.ring}`}>
-              <option value="KREDIT">Uang Masuk (Kredit)</option>
-              <option value="DEBIT">Uang Keluar (Debit)</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Nominal (Rp)</label>
-            <input type="number" name="nominal" value={formData.nominal} onChange={handleChange} required className={`w-full border-gray-300 rounded-lg shadow-sm p-2 border ${theme.ring}`} />
-          </div>
+        <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">Tipe</label>
+              <select value={form.tipe} onChange={(e) => setForm({...form, tipe: e.target.value})} className={`w-full p-2 border rounded-lg ${theme.ring}`}>
+                <option value="KREDIT">Uang Masuk (Kredit)</option>
+                <option value="DEBIT">Uang Keluar (Debit)</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">Nominal (Rp)</label>
+              <input type="number" value={form.nominal} onChange={(e) => setForm({...form, nominal: e.target.value})} required className={`w-full p-2 border rounded-lg ${theme.ring}`} />
+            </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="block text-sm font-medium text-gray-600 mb-1">Kategori</label><select name="id_kategori" value={formData.id_kategori} onChange={handleChange} required className={`w-full border-gray-300 rounded-lg shadow-sm p-2 border ${theme.ring}`}><option value="">-- Pilih --</option>{kategoriList.map(k => (<option key={k.id} value={k.id}>{k.nama}</option>))}</select></div>
-          <div><label className="block text-sm font-medium text-gray-600 mb-1">PJ</label><select name="id_pj" value={formData.id_pj} onChange={handleChange} required className={`w-full border-gray-300 rounded-lg shadow-sm p-2 border ${theme.ring}`}><option value="">-- Pilih --</option>{picList.map(p => (<option key={p.id} value={p.id}>{p.nama}</option>))}</select></div>
+        <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">Kategori</label>
+              <select value={form.id_kategori} onChange={(e) => setForm({...form, id_kategori: e.target.value})} className={`w-full p-2 border rounded-lg ${theme.ring}`}>
+                <option value="">-- Pilih --</option>
+                {(kategoriList || []).map(k => <option key={k.id} value={k.id}>{k.nama}</option>)}
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">PJ</label>
+              <select value={form.id_pj} onChange={(e) => setForm({...form, id_pj: e.target.value})} className={`w-full p-2 border rounded-lg ${theme.ring}`}>
+                <option value="">-- Pilih --</option>
+                {(picList || []).map(p => <option key={p.id} value={p.id}>{p.nama}</option>)}
+              </select>
+            </div>
         </div>
 
-        <div><label className="block text-sm font-medium text-gray-600 mb-1">Keterangan</label><input type="text" name="keterangan" value={formData.keterangan} onChange={handleChange} className={`w-full border-gray-300 rounded-lg shadow-sm p-2 border ${theme.ring}`} required /></div>
-        <div><label className="block text-sm font-medium text-gray-600 mb-1">Bukti Transaksi (Maks 1 MB)</label><input type="file" id="fileInput" accept="image/jpeg, image/png, application/pdf" onChange={handleFileChange} className={`w-full border-gray-300 rounded-lg shadow-sm p-2 border text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 ${theme.ring}`} /></div>
+        <div>
+            <label className="block text-sm font-medium mb-1">Keterangan</label>
+            <input type="text" value={form.keterangan} onChange={(e) => setForm({...form, keterangan: e.target.value})} className={`w-full p-2 border rounded-lg ${theme.ring}`} />
+        </div>
 
-        <button type="submit" className={`w-full text-white font-bold py-3 px-4 rounded-lg transition ${editData ? 'bg-orange-500 hover:bg-orange-600' : theme.btn}`}>
-          {editData ? 'Update Transaksi' : 'Simpan Transaksi'}
-        </button>
+        <div>
+            <label className="block text-sm font-medium mb-1">Bukti Transaksi (Maks 1 MB)</label>
+            <input type="file" accept="image/*" className={`w-full bg-white p-2 border rounded-lg ${theme.ring}`} />
+        </div>
+
+        <div className="flex gap-2 mt-2">
+            <button type="submit" className={`flex-1 text-white font-bold py-3 rounded-lg ${editData ? 'bg-orange-500 hover:bg-orange-600' : theme.btn}`}>{editData ? 'Update Transaksi' : 'Simpan Transaksi'}</button>
+            {editData && <button type="button" onClick={onCancelEdit} className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-4 rounded-lg">Batal</button>}
+        </div>
       </form>
     </div>
   );

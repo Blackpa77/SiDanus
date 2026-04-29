@@ -57,12 +57,12 @@ export default function App() {
   }, []);
 
   const loadData = () => {
-    fetch('http://localhost:3000/api/stats').then((r) => r.json()).then((d) => setStats(d));
-    fetch('http://localhost:3000/api/transaksi').then((r) => r.json()).then((d) => setTransaksi(d));
-    fetch('http://localhost:3000/api/pic').then((r) => r.json()).then((d) => setPicList(d));
-    fetch('http://localhost:3000/api/kategori').then((r) => r.json()).then((d) => setKategoriList(d));
-    fetch('http://localhost:3000/api/paid-promote').then((r) => r.json()).then((d) => setPaidPromotes(d));
-    fetch('http://localhost:3000/api/proposal').then((r) => r.json()).then((d) => setProposals(d));
+    fetch('http://localhost:3000/api/stats').then((r) => r.json()).then((d) => setStats(d)).catch(()=>null);
+    fetch('http://localhost:3000/api/transaksi').then((r) => r.json()).then((d) => setTransaksi(d)).catch(()=>null);
+    fetch('http://localhost:3000/api/pic').then((r) => r.json()).then((d) => setPicList(d)).catch(()=>null);
+    fetch('http://localhost:3000/api/kategori').then((r) => r.json()).then((d) => setKategoriList(d)).catch(()=>null);
+    fetch('http://localhost:3000/api/paid-promote').then((r) => r.json()).then((d) => setPaidPromotes(d)).catch(()=>null);
+    fetch('http://localhost:3000/api/proposal').then((r) => r.json()).then((d) => setProposals(d)).catch(()=>null);
   };
   useEffect(() => { if (isLoggedIn) loadData(); }, [isLoggedIn]);
 
@@ -73,13 +73,19 @@ export default function App() {
   // FUNGSI PINTAR UNTUK KATEGORI OTOMATIS
   const getKategoriOtomatis = (tx) => {
     if (tx.kategori?.nama) return tx.kategori.nama;
-    if (tx.keterangan?.toLowerCase().includes('paid promote')) return 'Paid Promote';
-    if (tx.keterangan?.toLowerCase().includes('proposal')) return 'Proposal';
+    if (tx.keterangan?.toLowerCase().includes('paid promote')) return 'Paid Promote (Auto)';
+    if (tx.keterangan?.toLowerCase().includes('proposal')) return 'Proposal (Auto)';
     return '-';
   };
 
-  const dataBar = [{ name: 'Arus Kas', Pemasukan: stats.total_kredit, Pengeluaran: stats.total_debit }];
-  const dataPie = transaksi.filter((t) => t.tipe === 'DEBIT').reduce((acc, curr) => {
+  const safeTransaksi = Array.isArray(transaksi) ? transaksi : [];
+  const safePicList = Array.isArray(picList) ? picList : [];
+  const safeKategoriList = Array.isArray(kategoriList) ? kategoriList : [];
+  const safePaidPromotes = Array.isArray(paidPromotes) ? paidPromotes : [];
+  const safeProposals = Array.isArray(proposals) ? proposals : [];
+
+  const dataBar = [{ name: 'Arus Kas', Pemasukan: stats.total_kredit || 0, Pengeluaran: stats.total_debit || 0 }];
+  const dataPie = safeTransaksi.filter((t) => t.tipe === 'DEBIT').reduce((acc, curr) => {
       const cat = getKategoriOtomatis(curr);
       const existing = acc.find((item) => item.name === cat);
       if (existing) existing.value += curr.nominal;
@@ -98,7 +104,7 @@ export default function App() {
   const exportExcel = () => {
     const headers = ['ID', 'Tanggal', 'Tipe', 'Kategori', 'PJ', 'Keterangan', 'Nominal'];
     const rows = [headers.join(',')];
-    transaksi.forEach((t) => {
+    safeTransaksi.forEach((t) => {
       const idStr = `TRX-${t.id.toString().padStart(4, '0')}`;
       rows.push([idStr, t.tanggal.split('T')[0], t.tipe, getKategoriOtomatis(t), t.pj?.nama || '-', `"${t.keterangan || ''}"`, t.nominal].join(','));
     });
@@ -135,7 +141,7 @@ export default function App() {
   };
   const hapusProp = async (id) => { if (window.confirm('Yakin ingin menghapus Proposal ini permanen? Data Transparansi terkait juga akan terhapus.')) { await fetch(`http://localhost:3000/api/proposal/${id}`, { method: 'DELETE' }); showNotif('Proposal berhasil dihapus!'); loadData(); } };
 
-  // ==== HANDLERS PENGATURAN (PJ & KATEGORI) ====
+  // ==== HANDLERS PENGATURAN ====
   const handleUpdateCreds = (e) => { e.preventDefault(); setCredentials(inputGantiCreds); localStorage.setItem('sidanus_creds', JSON.stringify(inputGantiCreds)); setNotifCreds('Kredensial Login berhasil diubah.'); setTimeout(() => setNotifCreds(''), 4000); };
   const handleTambahPj = async (e) => { e.preventDefault(); try { const res = await fetch('http://localhost:3000/api/pic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nama: namaPjBaru }) }); if (res.ok) { setNotifPj(`PJ sukses ditambahkan!`); setNamaPjBaru(''); loadData(); setTimeout(() => setNotifPj(''), 4000); } } catch (err) { setNotifPj('Gagal nyimpan PJ!'); } };
   const handleHapusPj = async (id, nama) => { if (window.confirm(`Yakin mau menghapus PJ "${nama}"?`)) { await fetch(`http://localhost:3000/api/pic/${id}`, { method: 'DELETE' }); setNotifPj(`PJ "${nama}" dihapus!`); loadData(); setTimeout(() => setNotifPj(''), 4000); } };
@@ -161,7 +167,6 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-800 print:bg-white print:h-auto">
-      {/* SIDEBAR */}
       <aside className={`w-64 text-white flex flex-col shadow-xl z-10 print:hidden ${activeTheme.bgSide} transition-colors duration-500`}>
         <div className={`h-20 flex items-center justify-center border-b ${activeTheme.border}`}><h1 className="text-2xl font-bold tracking-wider">Si<span className={activeTheme.textAccent}>Danus</span></h1></div>
         <nav className="flex-1 px-4 py-6 space-y-2">
@@ -197,7 +202,8 @@ export default function App() {
           {activeMenu === 'transparansi' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:block print:w-full">
               <div className="lg:col-span-1 print:hidden">
-                <FormTransaksi theme={activeTheme} editData={editTxData} onCancelEdit={() => setEditTxData(null)} onSuccess={(aksi) => { showNotif(`Transaksi manual berhasil ${aksi}!`); setEditTxData(null); loadData(); }} />
+                {/* DISINI KITA PASSING DATANYA KE FORM BIAR DROPDOWN NYALA! */}
+                <FormTransaksi theme={activeTheme} editData={editTxData} onCancelEdit={() => setEditTxData(null)} onSuccess={(aksi) => { showNotif(`Transaksi manual berhasil ${aksi}!`); setEditTxData(null); loadData(); }} picList={safePicList} kategoriList={safeKategoriList} />
               </div>
               <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex flex-col print:shadow-none print:border-0 print:m-0 print:p-0 print:block">
                 <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center print:hidden"><h4 className="font-bold text-gray-700">Riwayat Transaksi Utama</h4><div className="flex gap-2"><button onClick={exportPDF} className="bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold py-2 px-4 rounded-lg">Ekspor PDF</button><button onClick={exportExcel} className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg">Ekspor Excel</button></div></div>
@@ -206,8 +212,8 @@ export default function App() {
                   <table className="w-full text-sm text-left text-gray-600 print:border-collapse print:w-full print:border print:border-gray-800">
                     <thead className="text-xs text-gray-700 uppercase bg-gray-100 print:bg-gray-200"><tr><th className="px-4 py-3 print:border print:border-gray-800">ID</th><th className="px-4 py-3 print:border print:border-gray-800">Tanggal</th><th className="px-4 py-3 print:border print:border-gray-800">Keterangan</th><th className="px-4 py-3 print:border print:border-gray-800">Kategori</th><th className="px-4 py-3 print:border print:border-gray-800">PJ</th><th className="px-4 py-3 print:border print:border-gray-800 text-right">Nominal</th><th className="px-4 py-3 text-center print:hidden">Aksi</th></tr></thead>
                     <tbody>
-                      {transaksi.length === 0 ? ( <tr><td colSpan="7" className="text-center py-8 print:border print:border-gray-800">Belum ada transaksi</td></tr> ) : (
-                        transaksi.map((tx) => (
+                      {safeTransaksi.length === 0 ? ( <tr><td colSpan="7" className="text-center py-8 print:border print:border-gray-800">Belum ada transaksi</td></tr> ) : (
+                        safeTransaksi.map((tx) => (
                           <tr key={tx.id} className="border-b hover:bg-gray-50 print:border-b print:border-gray-800">
                             <td className="px-4 py-3 font-mono font-bold text-gray-500 print:border print:border-gray-800">TRX-{tx.id.toString().padStart(4, '0')}</td>
                             <td className="px-4 py-3 whitespace-nowrap print:border print:border-gray-800">{formatTanggalDB(tx.tanggal)}</td>
@@ -253,8 +259,8 @@ export default function App() {
                   <table className="w-full text-sm text-left">
                     <thead className="bg-gray-100 text-xs uppercase"><tr><th className="p-3">ID</th><th className="p-3">Pemesan</th><th className="p-3">Durasi</th><th className="p-3">Harga</th><th className="p-3">Status</th><th className="p-3 text-center">Aksi</th></tr></thead>
                     <tbody>
-                      {paidPromotes.length === 0 ? ( <tr><td colSpan="6" className="text-center py-8 text-gray-500">Belum ada PP</td></tr> ) : (
-                        paidPromotes.map((pp) => {
+                      {safePaidPromotes.length === 0 ? ( <tr><td colSpan="6" className="text-center py-8 text-gray-500">Belum ada PP</td></tr> ) : (
+                        safePaidPromotes.map((pp) => {
                           const isExpired = new Date() > new Date(pp.tanggal_selesai);
                           const statusVisual = pp.status === 'Dibatalkan' ? 'bg-rose-100 text-rose-700' : isExpired ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700';
                           const statusText = pp.status === 'Dibatalkan' ? 'Dibatalkan' : isExpired ? 'Selesai' : 'Aktif';
@@ -298,8 +304,8 @@ export default function App() {
                   <table className="w-full text-sm text-left">
                     <thead className="bg-gray-100 text-xs uppercase"><tr><th className="p-3">ID</th><th className="p-3">PJ Pengantar</th><th className="p-3">Instansi</th><th className="p-3">Status</th><th className="p-3">Cair</th><th className="p-3 text-center">Aksi</th></tr></thead>
                     <tbody>
-                      {proposals.length === 0 ? ( <tr><td colSpan="6" className="text-center py-8 text-gray-500">Belum ada proposal</td></tr> ) : (
-                        proposals.map((pr) => (
+                      {safeProposals.length === 0 ? ( <tr><td colSpan="6" className="text-center py-8 text-gray-500">Belum ada proposal</td></tr> ) : (
+                        safeProposals.map((pr) => (
                           <tr key={pr.id} className="border-b hover:bg-gray-50">
                             <td className="p-3 font-mono font-bold text-gray-500">PROP-{pr.id.toString().padStart(3, '0')}</td><td className="p-3">{pr.pj_pengantar}</td><td className="p-3 font-bold">{pr.instansi}</td>
                             <td className="p-3">
@@ -349,7 +355,7 @@ export default function App() {
                   <div className="border-t pt-4">
                     <h4 className="text-sm font-bold text-gray-600 mb-3">Daftar PJ Aktif:</h4>
                     <ul className="space-y-2 max-h-48 overflow-y-auto">
-                      {picList.map((pj) => (
+                      {safePicList.map((pj) => (
                         <li key={pj.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200"><span className="font-medium text-gray-700">{pj.nama}</span><button onClick={() => handleHapusPj(pj.id, pj.nama)} className="text-rose-500 hover:bg-rose-100 text-sm font-bold px-3 py-1 rounded-md transition">Hapus</button></li>
                       ))}
                     </ul>
@@ -368,7 +374,7 @@ export default function App() {
                   <div className="border-t pt-4">
                     <h4 className="text-sm font-bold text-gray-600 mb-3">Kategori Tersedia:</h4>
                     <ul className="space-y-2 max-h-48 overflow-y-auto">
-                      {kategoriList.map((kat) => (
+                      {safeKategoriList.map((kat) => (
                         <li key={kat.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200"><span className="font-medium text-gray-700">{kat.nama}</span><button onClick={() => handleHapusKategori(kat.id, kat.nama)} className="text-rose-500 hover:bg-rose-100 text-sm font-bold px-3 py-1 rounded-md transition">Hapus</button></li>
                       ))}
                     </ul>
