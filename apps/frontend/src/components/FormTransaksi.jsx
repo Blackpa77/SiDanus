@@ -5,6 +5,7 @@ export default function FormTransaksi() {
   const [picList, setPicList] = useState([]);
   
   const [formData, setFormData] = useState({
+    tanggal: new Date().toISOString().split('T')[0], // Default tanggal hari ini
     nominal: '',
     keterangan: '',
     id_kategori: '',
@@ -12,7 +13,6 @@ export default function FormTransaksi() {
     tipe: 'KREDIT'
   });
 
-  // Ambil data untuk Dropdown dari Backend
   useEffect(() => {
     fetch('http://localhost:3000/api/kategori')
       .then(res => res.json())
@@ -27,7 +27,7 @@ export default function FormTransaksi() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const response = await fetch('http://localhost:3000/api/transaksi', {
@@ -38,7 +38,7 @@ const handleSubmit = async (e) => {
       
       if (response.ok) {
         alert("Mantap! Transaksi berhasil disimpan ke Supabase.");
-        window.location.reload(); // Refresh halaman biar saldonya langsung update
+        window.location.reload(); 
       }
     } catch (error) {
       console.error("Gagal nyimpan:", error);
@@ -51,6 +51,13 @@ const handleSubmit = async (e) => {
       <h3 className="text-lg font-bold text-gray-700 mb-4">Input Transaksi Baru</h3>
       
       <form onSubmit={handleSubmit} className="space-y-4">
+        
+        {/* INPUT TANGGAL */}
+        <div>
+          <label className="block text-sm font-medium text-gray-600 mb-1">Tanggal Transaksi</label>
+          <input type="date" name="tanggal" value={formData.tanggal} onChange={handleChange} required className="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-2 border" />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">Tipe Transaksi</label>
@@ -76,9 +83,9 @@ const handleSubmit = async (e) => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">PIC (Panitia)</label>
+            <label className="block text-sm font-medium text-gray-600 mb-1">PJ (Panitia)</label>
             <select name="id_pj" onChange={handleChange} required className="w-full border-gray-300 rounded-lg shadow-sm p-2 border">
-              <option value="">-- Pilih PIC --</option>
+              <option value="">-- Pilih PJ --</option>
               {picList.map(p => (
                 <option key={p.id} value={p.id}>{p.nama}</option>
               ))}

@@ -12,7 +12,6 @@ function App() {
   const [inputLogin, setInputLogin] = useState({ username: '', password: '' });
   const [inputGantiCreds, setInputGantiCreds] = useState({ username: credentials.username, password: credentials.password });
 
-  // ==== STATE NOTIFIKASI DALAM KOTAK (PENGGANTI ALERT) ====
   const [loginError, setLoginError] = useState('');
   const [notifCreds, setNotifCreds] = useState('');
   const [notifPj, setNotifPj] = useState('');
@@ -21,19 +20,36 @@ function App() {
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [stats, setStats] = useState({ total_kredit: 0, total_debit: 0, saldo_saat_ini: 0 });
   const [transaksi, setTransaksi] = useState([]);
+  
+  const [picList, setPicList] = useState([]); // State untuk daftar PJ
   const [namaPjBaru, setNamaPjBaru] = useState('');
 
+  // ==== STATE JAM LIVE ====
+  const [waktuLive, setWaktuLive] = useState(new Date());
+
+  // Effect untuk Jam Digital
+  useEffect(() => {
+    const intervalWaktu = setInterval(() => setWaktuLive(new Date()), 1000);
+    return () => clearInterval(intervalWaktu);
+  }, []);
+
+  const formatJam = waktuLive.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+  const formatHariTanggal = waktuLive.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Effect Tarik Data Database
   useEffect(() => {
     if (isLoggedIn) {
       fetch('http://localhost:3000/api/stats')
         .then(res => res.json())
-        .then(data => setStats(data))
-        .catch(err => console.error("Gagal load stats:", err));
+        .then(data => setStats(data));
 
       fetch('http://localhost:3000/api/transaksi')
         .then(res => res.json())
-        .then(data => setTransaksi(data))
-        .catch(err => console.error("Gagal load transaksi:", err));
+        .then(data => setTransaksi(data));
+
+      fetch('http://localhost:3000/api/pic')
+        .then(res => res.json())
+        .then(data => setPicList(data));
     }
   }, [isLoggedIn]);
 
@@ -49,7 +65,6 @@ function App() {
       setIsLoggedIn(true);
       localStorage.setItem('isLoggedIn', 'true');
     } else {
-      // Tampilkan error di dalam kotak login
       setLoginError('Username atau Password salah bro!');
     }
   };
@@ -59,37 +74,50 @@ function App() {
       setIsLoggedIn(false);
       localStorage.removeItem('isLoggedIn');
       setActiveMenu('dashboard');
-      setLoginError(''); // Reset pesan error
+      setLoginError(''); 
     }
   };
 
-  // ==== HANDLER PENGATURAN ====
-const handleTambahPj = async (e) => {
+  // ==== HANDLER PENGATURAN PJ ====
+  const handleTambahPj = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:3000/api/pic', {
+      const res = await fetch('http://localhost:3000/api/pic', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nama: namaPjBaru })
       });
-
-      if (response.ok) {
-        setNotifPj(`PJ "${namaPjBaru}" sukses tersimpan di database!`);
+      if (res.ok) {
+        setNotifPj(`PJ "${namaPjBaru}" sukses tersimpan!`);
         setNamaPjBaru('');
+        // Refresh list PJ
+        fetch('http://localhost:3000/api/pic').then(r => r.json()).then(d => setPicList(d));
         setTimeout(() => setNotifPj(''), 4000);
       }
     } catch (error) {
-      setNotifPj('Gagal nyimpan PJ baru, cek koneksi backend!');
-      setTimeout(() => setNotifPj(''), 4000);
+      setNotifPj('Gagal nyimpan PJ baru, cek koneksi!');
     }
   };
+
+  const handleHapusPj = async (id, nama) => {
+    if(window.confirm(`Yakin mau menghapus PJ "${nama}" secara permanen?`)) {
+      try {
+        await fetch(`http://localhost:3000/api/pic/${id}`, { method: 'DELETE' });
+        setNotifPj(`PJ "${nama}" berhasil dihapus!`);
+        setPicList(picList.filter(pj => pj.id !== id));
+        setTimeout(() => setNotifPj(''), 4000);
+      } catch (error) {
+        alert("Gagal menghapus PJ.");
+      }
+    }
+  };
+
   const handleUpdateCreds = (e) => {
     e.preventDefault();
     setCredentials(inputGantiCreds);
     localStorage.setItem('sidanus_creds', JSON.stringify(inputGantiCreds));
-    // Tampilkan notifikasi sukses di dalam kotak Kredensial
     setNotifCreds('Mantap! Username & Password berhasil diubah.');
-    setTimeout(() => setNotifCreds(''), 4000); // Hilang otomatis setelah 4 detik
+    setTimeout(() => setNotifCreds(''), 4000);
   };
 
   // ==========================================
@@ -104,7 +132,6 @@ const handleTambahPj = async (e) => {
             <p className="text-gray-500 font-medium">Portal Keuangan INFEST</p>
           </div>
 
-          {/* Kotak Pesan Error Login */}
           {loginError && (
             <div className="mb-6 p-4 bg-rose-50 border-l-4 border-rose-500 text-rose-700 rounded-r-lg text-sm font-semibold text-center">
               {loginError}
@@ -114,27 +141,13 @@ const handleTambahPj = async (e) => {
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Username</label>
-              <input 
-                type="text" 
-                required 
-                className="w-full border-gray-300 bg-gray-50 rounded-xl p-3 border focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition" 
-                placeholder="Masukkan username"
-                onChange={e => setInputLogin({...inputLogin, username: e.target.value})} 
-              />
+              <input type="text" required className="w-full border-gray-300 bg-gray-50 rounded-xl p-3 border focus:border-emerald-500 outline-none transition" placeholder="Masukkan username" onChange={e => setInputLogin({...inputLogin, username: e.target.value})} />
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Password</label>
-              <input 
-                type="password" 
-                required 
-                className="w-full border-gray-300 bg-gray-50 rounded-xl p-3 border focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition" 
-                placeholder="Masukkan password"
-                onChange={e => setInputLogin({...inputLogin, password: e.target.value})} 
-              />
+              <input type="password" required className="w-full border-gray-300 bg-gray-50 rounded-xl p-3 border focus:border-emerald-500 outline-none transition" placeholder="Masukkan password" onChange={e => setInputLogin({...inputLogin, password: e.target.value})} />
             </div>
-            <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl hover:bg-emerald-700 active:bg-emerald-800 transition mt-4 shadow-lg shadow-emerald-600/30">
-              Masuk Dashboard
-            </button>
+            <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl hover:bg-emerald-700 active:bg-emerald-800 transition mt-4 shadow-lg shadow-emerald-600/30">Masuk Dashboard</button>
           </form>
         </div>
       </div>
@@ -142,7 +155,7 @@ const handleTambahPj = async (e) => {
   }
 
   // ==========================================
-  // VIEW 2: HALAMAN UTAMA (Sudah Login)
+  // VIEW 2: HALAMAN UTAMA 
   // ==========================================
   return (
     <div className="flex h-screen bg-green-50 font-sans text-gray-800">
@@ -158,9 +171,7 @@ const handleTambahPj = async (e) => {
           <button onClick={() => setActiveMenu('pengaturan')} className={`w-full text-left px-4 py-3 rounded-lg font-semibold transition ${activeMenu === 'pengaturan' ? 'bg-emerald-700 shadow-sm' : 'hover:bg-emerald-700/50'}`}>Pengaturan</button>
         </nav>
         <div className="p-4 border-t border-emerald-700">
-          <button onClick={handleLogout} className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-lg transition shadow-sm">
-            Keluar (Logout)
-          </button>
+          <button onClick={handleLogout} className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-lg transition shadow-sm">Keluar (Logout)</button>
         </div>
       </aside>
 
@@ -183,6 +194,18 @@ const handleTambahPj = async (e) => {
           {/* TAMPILAN: DASHBOARD */}
           {activeMenu === 'dashboard' && (
             <div className="space-y-6">
+              
+              {/* JAM LIVE DIGITAL */}
+              <div className="bg-gradient-to-r from-emerald-800 to-emerald-600 text-white p-6 rounded-2xl shadow-md flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-medium text-emerald-100 mb-1">Waktu Saat Ini</h3>
+                  <p className="text-xl font-bold">{formatHariTanggal}</p>
+                </div>
+                <div className="text-3xl font-mono font-bold bg-emerald-900/50 px-6 py-3 rounded-xl border border-emerald-700 shadow-inner tracking-widest">
+                  {formatJam}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-blue-500">
                   <p className="text-sm text-gray-500 font-semibold mb-1">Total Saldo Tersedia</p>
@@ -197,14 +220,6 @@ const handleTambahPj = async (e) => {
                   <h3 className="text-2xl font-bold text-rose-600">-{formatRupiah(stats.total_debit)}</h3>
                 </div>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <div className="bg-white p-6 rounded-2xl shadow-sm h-80 flex flex-col items-center justify-center border border-dashed border-gray-300">
-                    <h4 className="font-bold text-gray-400">Area Grafik Arus Kas (Bar Chart)</h4>
-                 </div>
-                 <div className="bg-white p-6 rounded-2xl shadow-sm h-80 flex flex-col items-center justify-center border border-dashed border-gray-300">
-                    <h4 className="font-bold text-gray-400">Area Persentase Pengeluaran (Pie Chart)</h4>
-                 </div>
-              </div>
             </div>
           )}
 
@@ -215,11 +230,22 @@ const handleTambahPj = async (e) => {
                 <FormTransaksi />
               </div>
               <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex flex-col">
-                <div className="px-6 py-4 border-b bg-gray-50">
+                <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
                   <h4 className="font-bold text-gray-700">Tabel Riwayat Transaksi</h4>
+                  
+                  {/* FITUR EKSPOR PDF & EXCEL */}
+                  <div className="flex gap-2">
+                    <button className="bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold py-2 px-4 rounded-lg shadow-sm transition">
+                      Ekspor PDF
+                    </button>
+                    <button className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow-sm transition">
+                      Ekspor Excel
+                    </button>
+                  </div>
+
                 </div>
                 <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
-                  <p className="text-gray-500 text-sm">Belum ada data transaksi yang tersimpan.</p>
+                  <p className="text-gray-500 text-sm">Tabel riwayat menyusul setelah diintegrasikan penuh.</p>
                 </div>
               </div>
             </div>
@@ -229,68 +255,44 @@ const handleTambahPj = async (e) => {
           {activeMenu === 'pengaturan' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              {/* Card 1: Ganti Password */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
                 <h3 className="text-lg font-bold text-gray-700 mb-2">Kredensial Login</h3>
                 <p className="text-sm text-gray-500 mb-4">Ubah username dan password untuk mengakses SiDanus.</p>
-                
-                {notifCreds && (
-                  <div className="mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-700 text-sm font-semibold">
-                    {notifCreds}
-                  </div>
-                )}
-
+                {notifCreds && <div className="mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-700 text-sm font-semibold">{notifCreds}</div>}
                 <form onSubmit={handleUpdateCreds} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">Username Baru</label>
-                    <input 
-                      type="text" 
-                      value={inputGantiCreds.username}
-                      onChange={(e) => setInputGantiCreds({...inputGantiCreds, username: e.target.value})}
-                      required
-                      className="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 border"
-                    />
+                    <input type="text" value={inputGantiCreds.username} onChange={(e) => setInputGantiCreds({...inputGantiCreds, username: e.target.value})} required className="w-full border-gray-300 rounded-lg shadow-sm p-3 border focus:border-emerald-500" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">Password Baru</label>
-                    <input 
-                      type="password" 
-                      value={inputGantiCreds.password}
-                      onChange={(e) => setInputGantiCreds({...inputGantiCreds, password: e.target.value})}
-                      required
-                      className="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 border"
-                    />
+                    <input type="password" value={inputGantiCreds.password} onChange={(e) => setInputGantiCreds({...inputGantiCreds, password: e.target.value})} required className="w-full border-gray-300 rounded-lg shadow-sm p-3 border focus:border-emerald-500" />
                   </div>
-                  <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition mt-2">
-                    Simpan Perubahan Login
-                  </button>
+                  <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition">Simpan Perubahan Login</button>
                 </form>
               </div>
 
-              {/* Card 2: Tambah PJ */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
                 <h3 className="text-lg font-bold text-gray-700 mb-2">Manajemen Penanggung Jawab (PJ)</h3>
-                <p className="text-sm text-gray-500 mb-4">Tambahkan nama penanggung jawab baru ke dalam sistem.</p>
-                
-                {notifPj && (
-                  <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-500 text-blue-700 text-sm font-semibold">
-                    {notifPj}
-                  </div>
-                )}
-
-                <form onSubmit={handleTambahPj} className="flex flex-col gap-4">
-                  <input 
-                    type="text" 
-                    value={namaPjBaru}
-                    onChange={(e) => setNamaPjBaru(e.target.value)}
-                    placeholder="Masukkan nama PJ (contoh: Dika)" 
-                    required
-                    className="w-full border-gray-300 rounded-lg shadow-sm focus:border-emerald-500 focus:ring-emerald-500 p-3 border"
-                  />
-                  <button type="submit" className="bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-emerald-700 transition">
-                    Tambah PJ
-                  </button>
+                <p className="text-sm text-gray-500 mb-4">Tambahkan atau hapus nama penanggung jawab.</p>
+                {notifPj && <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-500 text-blue-700 text-sm font-semibold">{notifPj}</div>}
+                <form onSubmit={handleTambahPj} className="flex gap-4 mb-6">
+                  <input type="text" value={namaPjBaru} onChange={(e) => setNamaPjBaru(e.target.value)} placeholder="Nama PJ (cth: Dika)" required className="flex-1 border-gray-300 rounded-lg shadow-sm p-3 border focus:border-emerald-500" />
+                  <button type="submit" className="bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-emerald-700 transition">Tambah</button>
                 </form>
+
+                {/* LIST PJ UNTUK DIHAPUS */}
+                <div className="border-t pt-4">
+                  <h4 className="text-sm font-bold text-gray-600 mb-3">Daftar PJ Aktif:</h4>
+                  <ul className="space-y-2 max-h-48 overflow-y-auto">
+                    {picList.map(pj => (
+                      <li key={pj.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <span className="font-medium text-gray-700">{pj.nama}</span>
+                        <button onClick={() => handleHapusPj(pj.id, pj.nama)} className="text-rose-500 hover:text-rose-700 text-sm font-bold px-2 py-1 bg-rose-100 rounded-md">Hapus</button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
 
             </div>

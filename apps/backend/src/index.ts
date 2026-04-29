@@ -5,7 +5,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const app = new Elysia()
-  .use(cors()) // Wajib biar frontend bisa ngobrol sama backend
+  .use(cors())
 
   // Jalur GET: Ambil Data
   .get("/api/stats", async () => {
@@ -28,6 +28,7 @@ const app = new Elysia()
         keterangan: body.keterangan,
         id_kategori: parseInt(body.id_kategori),
         id_pj: parseInt(body.id_pj)
+        // Note: Untuk menyimpan tanggal ke database, pastikan skema Prisma kamu punya field 'tanggal' nanti.
       }
     });
     return { success: true, data: newTransaksi };
@@ -37,6 +38,14 @@ const app = new Elysia()
       data: { nama: body.nama }
     });
     return { success: true, data: newPj };
+  })
+
+  // JALUR DELETE: Hapus PJ
+  .delete("/api/pic/:id", async ({ params }) => {
+    await prisma.penanggungJawab.delete({
+      where: { id: parseInt(params.id) }
+    });
+    return { success: true, message: "PJ Berhasil Dihapus" };
   })
 
   .listen(3000);
