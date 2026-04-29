@@ -7,47 +7,55 @@ const prisma = new PrismaClient();
 const app = new Elysia()
   .use(cors())
 
-  // Jalur GET: Ambil Data
   .get("/api/stats", async () => {
     const kredit = await prisma.transaksi.aggregate({ _sum: { nominal: true }, where: { tipe: 'KREDIT' } });
     const debit = await prisma.transaksi.aggregate({ _sum: { nominal: true }, where: { tipe: 'DEBIT' } });
-    const total_kredit = kredit._sum.nominal || 0;
-    const total_debit = debit._sum.nominal || 0;
-    return { total_kredit, total_debit, saldo_saat_ini: total_kredit - total_debit };
+    return { total_kredit: kredit._sum.nominal || 0, total_debit: debit._sum.nominal || 0, saldo_saat_ini: (kredit._sum.nominal || 0) - (debit._sum.nominal || 0) };
   })
-  .get("/api/transaksi", async () => await prisma.transaksi.findMany({ include: { kategori: true, penanggungJawab: true }, orderBy: { id: 'desc' } }))
+  
+  // PERHATIKAN: Relasi sekarang bernama 'pj' sesuai skema kamu
+  .get("/api/transaksi", async () => await prisma.transaksi.findMany({ include: { kategori: true, pj: true }, orderBy: { id: 'desc' } }))
   .get("/api/kategori", async () => await prisma.kategori.findMany())
   .get("/api/pic", async () => await prisma.penanggungJawab.findMany())
 
-  // Jalur POST: Simpan Data Baru
   .post("/api/transaksi", async ({ body }: { body: any }) => {
-    const newTransaksi = await prisma.transaksi.create({
+    const newTx = await prisma.transaksi.create({
       data: {
+        tanggal: new Date(body.tanggal), // Convert string ke DateTime Prisma
         tipe: body.tipe,
-        nominal: parseInt(body.nominal),
+        nominal: parseFloat(body.nominal), // Float sesuai skema
         keterangan: body.keterangan,
         id_kategori: parseInt(body.id_kategori),
-        id_pj: parseInt(body.id_pj)
-        // Note: Untuk menyimpan tanggal ke database, pastikan skema Prisma kamu punya field 'tanggal' nanti.
+        id_pj: parseInt(body.id_pj),
+        bukti_url: body.bukti_url || null
       }
     });
-    return { success: true, data: newTransaksi };
-  })
-  .post("/api/pic", async ({ body }: { body: any }) => {
-    const newPj = await prisma.penanggungJawab.create({
-      data: { nama: body.nama }
-    });
-    return { success: true, data: newPj };
+    return { success: true, data: newTx };
   })
 
-  // JALUR DELETE: Hapus PJ
-  .delete("/api/pic/:id", async ({ params }) => {
-    await prisma.penanggungJawab.delete({
-      where: { id: parseInt(params.id) }
+  .put("/api/transaksi/:id", async ({ params, body }: { params: any, body: any }) => {
+    const updateTx = await prisma.transaksi.update({
+      where: { id: parseInt(params.id) },
+      data: {
+        tanggal: new Date(body.tanggal),
+        tipe: body.tipe,
+        nominal: parseFloat(body.nominal),
+        keterangan: body.keterangan,
+        id_kategori: parseInt(body.id_kategori),
+        id_pj: parseInt(body.id_pj),
+        bukti_url: body.bukti_url || null
+      }
     });
-    return { success: true, message: "PJ Berhasil Dihapus" };
+    return { success: true, data: updateTx };
   })
 
+  .delete("/api/transaksi/:id", async ({ params }) => {
+    await prisma.transaksi.delete({ where: { id: parseInt(params.id) } });
+    return { success: true };
+  })
+
+  .post("/api/pic", async ({ body }: { body: any }) => await prisma.penanggungJawab.create({ data: { nama: body.nama } }))
+  .delete("/api/pic/:id", async ({ params }) => { await prisma.penanggungJawab.delete({ where: { id: parseInt(params.id) }}); return {success: true}; })
   .listen(3000);
 
-console.log(`🦊 Backend SiDanus jalan dan siap nerima data di ${app.server?.hostname}:${app.server?.port}`);
+console.log(`🦊 Backend SiDanus API (V2 Skema Baru) Jalan!`);

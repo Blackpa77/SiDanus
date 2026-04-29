@@ -26,21 +26,35 @@ model PenanggungJawab {
   transaksi Transaksi[]
 }
 
+// ... (kode generator & datasource di atasnya biarkan saja)
+
 enum TipeTransaksi {
-  DEBIT
   KREDIT
+  DEBIT
 }
 
 model Transaksi {
-  id             Int             @id @default(autoincrement())
-  tanggal        DateTime        @default(now())
-  id_kategori    Int
-  kategori       Kategori        @relation(fields: [id_kategori], references: [id])
-  id_pj          Int
-  pj             PenanggungJawab @relation(fields: [id_pj], references: [id])
-  nominal        Float           
-  keterangan     String?         
-  tipe           TipeTransaksi   
-  bukti_url      String?         
-  created_at     DateTime        @default(now())
+  id          Int             @id @default(autoincrement())
+  tanggal     DateTime        @default(now())
+  id_kategori Int
+  kategori    Kategori        @relation(fields: [id_kategori], references: [id])
+  id_pj       Int
+  pj          PenanggungJawab @relation(fields: [id_pj], references: [id])
+  nominal     Float            
+  keterangan  String?          
+  tipe        TipeTransaksi    
+  bukti_url   String?          
+  created_at  DateTime        @default(now())
+}
+
+model Kategori {
+  id        Int         @id @default(autoincrement())
+  nama      String      @unique
+  transaksi Transaksi[]
+}
+
+model PenanggungJawab {
+  id        Int         @id @default(autoincrement())
+  nama      String      @unique
+  transaksi Transaksi[]
 }
