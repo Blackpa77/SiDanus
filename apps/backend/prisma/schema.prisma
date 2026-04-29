@@ -7,21 +7,18 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-enum TipeTransaksi {
-  KREDIT
-  DEBIT
-}
+// Enum dihapus, diganti jadi String biasa di dalam model Transaksi
 
 model Transaksi {
   id          Int              @id @default(autoincrement())
   tanggal     DateTime         @default(now())
-  id_kategori Int?             // <-- Sekarang opsional
+  id_kategori Int?             
   kategori    Kategori?        @relation(fields: [id_kategori], references: [id])
-  id_pj       Int?             // <-- Sekarang opsional
+  id_pj       Int?             
   pj          PenanggungJawab? @relation(fields: [id_pj], references: [id])
   nominal     Float            
   keterangan  String?          
-  tipe        TipeTransaksi    
+  tipe        String           // <--- Diubah jadi String
   bukti_url   String?          
   created_at  DateTime         @default(now())
 }
@@ -47,7 +44,7 @@ model PaidPromote {
   tanggal_selesai DateTime
   harga           Float
   status          String   @default("Aktif")
-  transaksi_id    Int?     // Menyimpan ID relasi ke tabel Transaksi
+  transaksi_id    Int?     
   created_at      DateTime @default(now())
 }
 
@@ -57,6 +54,6 @@ model Proposal {
   instansi     String
   status       String   @default("Menunggu")
   nominal_cair Float?
-  transaksi_id Int?     // Menyimpan ID relasi ke tabel Transaksi
+  transaksi_id Int?     
   created_at   DateTime @default(now())
 }
