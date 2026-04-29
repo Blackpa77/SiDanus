@@ -3,30 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
-
-model User {
-  id       Int    @id @default(autoincrement())
-  username String @unique
-  password String 
-}
-
-model Kategori {
-  id        Int         @id @default(autoincrement())
-  nama      String      @unique // Contoh: Danus Makanan, Sponsorship
-  transaksi Transaksi[]
-}
-
-model PenanggungJawab {
-  id        Int         @id @default(autoincrement())
-  nama      String      @unique // Contoh: Nama Panitia
-  transaksi Transaksi[]
-}
-
-// ... (kode generator & datasource di atasnya biarkan saja)
 
 enum TipeTransaksi {
   KREDIT
@@ -34,17 +13,17 @@ enum TipeTransaksi {
 }
 
 model Transaksi {
-  id          Int             @id @default(autoincrement())
-  tanggal     DateTime        @default(now())
-  id_kategori Int
-  kategori    Kategori        @relation(fields: [id_kategori], references: [id])
-  id_pj       Int
-  pj          PenanggungJawab @relation(fields: [id_pj], references: [id])
+  id          Int              @id @default(autoincrement())
+  tanggal     DateTime         @default(now())
+  id_kategori Int?             // <-- Sekarang opsional
+  kategori    Kategori?        @relation(fields: [id_kategori], references: [id])
+  id_pj       Int?             // <-- Sekarang opsional
+  pj          PenanggungJawab? @relation(fields: [id_pj], references: [id])
   nominal     Float            
   keterangan  String?          
   tipe        TipeTransaksi    
   bukti_url   String?          
-  created_at  DateTime        @default(now())
+  created_at  DateTime         @default(now())
 }
 
 model Kategori {
@@ -57,4 +36,27 @@ model PenanggungJawab {
   id        Int         @id @default(autoincrement())
   nama      String      @unique
   transaksi Transaksi[]
+}
+
+// ==== TABEL BARU PROGJA DANUS ====
+
+model PaidPromote {
+  id              Int      @id @default(autoincrement())
+  nama_pemesan    String
+  tanggal_mulai   DateTime
+  tanggal_selesai DateTime
+  harga           Float
+  status          String   @default("Aktif")
+  transaksi_id    Int?     // Menyimpan ID relasi ke tabel Transaksi
+  created_at      DateTime @default(now())
+}
+
+model Proposal {
+  id           Int      @id @default(autoincrement())
+  pj_pengantar String
+  instansi     String
+  status       String   @default("Menunggu")
+  nominal_cair Float?
+  transaksi_id Int?     // Menyimpan ID relasi ke tabel Transaksi
+  created_at   DateTime @default(now())
 }
