@@ -50,7 +50,10 @@ export default function App() {
   const [editPropData, setEditPropData] = useState(null);
   const [editPropNominal, setEditPropNominal] = useState('');
 
+  // === UI MODALS STATE ===
   const [showManual, setShowManual] = useState(false);
+  const [modal, setModal] = useState({ isOpen: false, type: 'confirm', title: '', message: '', placeholder: '', expectedText: '', confirmText: 'OK', isDanger: false, onConfirm: null });
+  const [modalInput, setModalInput] = useState('');
 
   useEffect(() => {
     const interval = setInterval(() => setWaktuLive(new Date()), 1000);
@@ -70,6 +73,10 @@ export default function App() {
   const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   const formatTanggalDB = (isoString) => isoString ? new Date(isoString).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
   const showNotif = (msg) => { setNotifTable(msg); window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => setNotifTable(''), 5000); };
+
+  // Helper untuk membuka popup keren
+  const openModal = (config) => { setModal({ ...config, isOpen: true }); setModalInput(''); };
+  const closeModal = () => setModal({ ...modal, isOpen: false });
 
   const getKategoriOtomatis = (tx) => {
     if (tx.kategori?.nama) return tx.kategori.nama;
@@ -107,7 +114,13 @@ export default function App() {
     if (inputLogin.username === credentials.username && inputLogin.password === credentials.password) { setLoginError(''); setIsLoggedIn(true); localStorage.setItem('isLoggedIn', 'true'); } 
     else { setLoginError('Username atau Password salah bro!'); }
   };
-  const handleLogout = () => { if (window.confirm('Yakin mau keluar?')) { setIsLoggedIn(false); localStorage.removeItem('isLoggedIn'); setActiveMenu('dashboard'); } };
+
+  const handleLogout = () => { 
+    openModal({
+      type: 'confirm', title: 'Konfirmasi Logout', message: 'Yakin mau keluar dari aplikasi SiDanus?', confirmText: 'Keluar', isDanger: true,
+      onConfirm: () => { setIsLoggedIn(false); localStorage.removeItem('isLoggedIn'); setActiveMenu('dashboard'); }
+    });
+  };
 
   // ==== HANDLERS TRANSPARANSI ====
   const exportExcel = () => {
@@ -123,57 +136,95 @@ export default function App() {
     const a = document.createElement('a'); a.href = url; a.download = 'Laporan_Keuangan_Danus.csv'; a.click();
   };
   const exportPDF = () => window.print();
-  const handleHapusTx = async (id) => { if (window.confirm('Yakin ingin menghapus transaksi ini?')) { await fetch(`http://localhost:3000/api/transaksi/${id}`, { method: 'DELETE' }); showNotif('Data transaksi berhasil dihapus!'); loadData(); } };
+
+  const handleHapusTx = (id) => { 
+    openModal({
+      type: 'confirm', title: 'Hapus Transaksi', message: 'Yakin ingin menghapus transaksi ini? Data akan hilang permanen.', confirmText: 'Hapus', isDanger: true,
+      onConfirm: async () => { await fetch(`http://localhost:3000/api/transaksi/${id}`, { method: 'DELETE' }); showNotif('✅ Data transaksi berhasil dihapus!'); loadData(); }
+    });
+  };
 
   // ==== HANDLERS PAID PROMOTE & PROPOSAL ====
   const hitungDurasiHari = (start, end) => { if (!start || !end) return 0; return Math.max(0, Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24))); };
   const submitPp = async (e) => {
     e.preventDefault();
-    if (editPpData) { await fetch(`http://localhost:3000/api/paid-promote/${editPpData.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formPp) }); showNotif('Paid Promote berhasil diupdate!'); } 
-    else { await fetch('http://localhost:3000/api/paid-promote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formPp) }); showNotif('Paid Promote disimpan! Dana otomatis masuk ke Transparansi!'); }
+    if (editPpData) { await fetch(`http://localhost:3000/api/paid-promote/${editPpData.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formPp) }); showNotif('✅ Paid Promote berhasil diupdate!'); } 
+    else { await fetch('http://localhost:3000/api/paid-promote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formPp) }); showNotif('✅ Paid Promote disimpan! Dana otomatis masuk ke Transparansi!'); }
     setFormPp({ nama_pemesan: '', tanggal_mulai: '', tanggal_selesai: '', harga: '' }); setEditPpData(null); loadData();
   };
   const triggerEditPp = (pp) => { setEditPpData(pp); setFormPp({ nama_pemesan: pp.nama_pemesan, tanggal_mulai: pp.tanggal_mulai.split('T')[0], tanggal_selesai: pp.tanggal_selesai.split('T')[0], harga: pp.harga }); };
-  const batalPp = async (id) => { if (window.confirm('Batalkan PP ini? Saldo Transparansi akan ditarik kembali.')) { await fetch(`http://localhost:3000/api/paid-promote/${id}/batal`, { method: 'PUT' }); showNotif('Paid Promote dibatalkan!'); loadData(); } };
-  const hapusPp = async (id) => { if (window.confirm('Yakin ingin menghapus Paid Promote ini permanen? Data Transparansi terkait juga akan terhapus.')) { await fetch(`http://localhost:3000/api/paid-promote/${id}`, { method: 'DELETE' }); showNotif('Paid Promote berhasil dihapus!'); loadData(); } };
+  
+  const batalPp = (id) => { 
+    openModal({
+      type: 'confirm', title: 'Batalkan Paid Promote', message: 'Batalkan PP ini? Saldo otomatis akan ditarik kembali dari Transparansi.', confirmText: 'Batalkan PP', isDanger: true,
+      onConfirm: async () => { await fetch(`http://localhost:3000/api/paid-promote/${id}/batal`, { method: 'PUT' }); showNotif('✅ Paid Promote dibatalkan!'); loadData(); }
+    });
+  };
+  
+  const hapusPp = (id) => { 
+    openModal({
+      type: 'confirm', title: 'Hapus Permanen PP', message: 'Yakin ingin menghapus Paid Promote ini permanen? Data Transparansi terkait juga akan terhapus.', confirmText: 'Hapus Permanen', isDanger: true,
+      onConfirm: async () => { await fetch(`http://localhost:3000/api/paid-promote/${id}`, { method: 'DELETE' }); showNotif('✅ Paid Promote berhasil dihapus!'); loadData(); }
+    });
+  };
 
   const submitProp = async (e) => {
     e.preventDefault();
-    if (editPropData) { await fetch(`http://localhost:3000/api/proposal/${editPropData.id}/edit`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formProp) }); showNotif('Data Proposal berhasil diupdate!'); } 
-    else { await fetch('http://localhost:3000/api/proposal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formProp) }); showNotif('Proposal berhasil ditambah!'); }
+    if (editPropData) { await fetch(`http://localhost:3000/api/proposal/${editPropData.id}/edit`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formProp) }); showNotif('✅ Data Proposal berhasil diupdate!'); } 
+    else { await fetch('http://localhost:3000/api/proposal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formProp) }); showNotif('✅ Proposal berhasil ditambah!'); }
     setFormProp({ pj_pengantar: '', instansi: '', status: 'Menunggu' }); setEditPropData(null); loadData();
   };
   const triggerEditProp = (pr) => { setEditPropData(pr); setFormProp({ pj_pengantar: pr.pj_pengantar, instansi: pr.instansi, status: pr.status }); };
   const updateStatusProp = async (id, status, nominal) => {
     await fetch(`http://localhost:3000/api/proposal/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, nominal_cair: nominal }) });
-    setEditPropId(null); setEditPropNominal(''); showNotif(status === 'Dicairkan' ? 'Hore cair! Dana otomatis masuk Transparansi!' : 'Status Proposal diupdate!'); loadData();
+    setEditPropId(null); setEditPropNominal(''); showNotif(status === 'Dicairkan' ? '✅ Hore cair! Dana otomatis masuk Transparansi!' : '✅ Status Proposal diupdate!'); loadData();
   };
-  const hapusProp = async (id) => { if (window.confirm('Yakin ingin menghapus Proposal ini permanen? Data Transparansi terkait juga akan terhapus.')) { await fetch(`http://localhost:3000/api/proposal/${id}`, { method: 'DELETE' }); showNotif('Proposal berhasil dihapus!'); loadData(); } };
+  
+  const hapusProp = (id) => { 
+    openModal({
+      type: 'confirm', title: 'Hapus Permanen Proposal', message: 'Yakin ingin menghapus Proposal ini permanen? Data Transparansi terkait juga akan terhapus.', confirmText: 'Hapus Permanen', isDanger: true,
+      onConfirm: async () => { await fetch(`http://localhost:3000/api/proposal/${id}`, { method: 'DELETE' }); showNotif('✅ Proposal berhasil dihapus!'); loadData(); }
+    });
+  };
 
   // ==== HANDLERS PENGATURAN ====
-  const handleUpdateCreds = (e) => { e.preventDefault(); setCredentials(inputGantiCreds); localStorage.setItem('sidanus_creds', JSON.stringify(inputGantiCreds)); setNotifCreds('Kredensial Login berhasil diubah.'); setTimeout(() => setNotifCreds(''), 4000); };
-  const handleTambahPj = async (e) => { e.preventDefault(); try { const res = await fetch('http://localhost:3000/api/pic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nama: namaPjBaru }) }); if (res.ok) { setNotifPj(`PJ sukses ditambahkan!`); setNamaPjBaru(''); loadData(); setTimeout(() => setNotifPj(''), 4000); } } catch (err) { setNotifPj('Gagal nyimpan PJ!'); } };
-  const handleHapusPj = async (id, nama) => { if (window.confirm(`Yakin mau menghapus PJ "${nama}"?`)) { await fetch(`http://localhost:3000/api/pic/${id}`, { method: 'DELETE' }); setNotifPj(`PJ "${nama}" dihapus!`); loadData(); setTimeout(() => setNotifPj(''), 4000); } };
-  const handleTambahKategori = async (e) => { e.preventDefault(); try { const res = await fetch('http://localhost:3000/api/kategori', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nama: namaKategoriBaru }) }); if (res.ok) { setNotifKategori(`Kategori sukses ditambahkan!`); setNamaKategoriBaru(''); loadData(); setTimeout(() => setNotifKategori(''), 4000); } } catch (err) { setNotifKategori('Gagal nyimpan Kategori!'); } };
-  const handleHapusKategori = async (id, nama) => { if (window.confirm(`Yakin mau menghapus Kategori "${nama}"?`)) { await fetch(`http://localhost:3000/api/kategori/${id}`, { method: 'DELETE' }); setNotifKategori(`Kategori "${nama}" dihapus!`); loadData(); setTimeout(() => setNotifKategori(''), 4000); } };
+  const handleUpdateCreds = (e) => { e.preventDefault(); setCredentials(inputGantiCreds); localStorage.setItem('sidanus_creds', JSON.stringify(inputGantiCreds)); setNotifCreds('✅ Kredensial Login berhasil diubah.'); setTimeout(() => setNotifCreds(''), 4000); };
+  const handleTambahPj = async (e) => { e.preventDefault(); try { const res = await fetch('http://localhost:3000/api/pic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nama: namaPjBaru }) }); if (res.ok) { setNotifPj(`✅ PJ sukses ditambahkan!`); setNamaPjBaru(''); loadData(); setTimeout(() => setNotifPj(''), 4000); } } catch (err) { setNotifPj('❌ Gagal nyimpan PJ!'); } };
+  const handleHapusPj = (id, nama) => { 
+    openModal({
+      type: 'confirm', title: 'Hapus Penanggung Jawab', message: `Yakin mau menghapus PJ bernama "${nama}" dari sistem?`, confirmText: 'Hapus PJ', isDanger: true,
+      onConfirm: async () => { await fetch(`http://localhost:3000/api/pic/${id}`, { method: 'DELETE' }); setNotifPj(`✅ PJ "${nama}" dihapus!`); loadData(); setTimeout(() => setNotifPj(''), 4000); }
+    });
+  };
 
-  // ==== HANDLER RESET DATABASE (DANGER ZONE) ====
-  const handleFactoryReset = async () => {
-    const yakin = window.confirm("PERINGATAN BAHAYA!\n\nApakah kamu yakin ingin MENGHAPUS SEMUA DATA (Transaksi, Paid Promote, Proposal, PJ, Kategori)? Data yang dihapus tidak bisa dikembalikan!");
-    if (yakin) {
-      const kataSandi = window.prompt("Ketik kata sandi 'RESET' (huruf besar semua) untuk konfirmasi penghapusan seluruh database secara permanen:");
-      if (kataSandi === 'RESET') {
+  const handleTambahKategori = async (e) => { e.preventDefault(); try { const res = await fetch('http://localhost:3000/api/kategori', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nama: namaKategoriBaru }) }); if (res.ok) { setNotifKategori(`✅ Kategori sukses ditambahkan!`); setNamaKategoriBaru(''); loadData(); setTimeout(() => setNotifKategori(''), 4000); } } catch (err) { setNotifKategori('❌ Gagal nyimpan Kategori!'); } };
+  const handleHapusKategori = (id, nama) => { 
+    openModal({
+      type: 'confirm', title: 'Hapus Kategori', message: `Yakin mau menghapus Kategori "${nama}" dari daftar?`, confirmText: 'Hapus Kategori', isDanger: true,
+      onConfirm: async () => { await fetch(`http://localhost:3000/api/kategori/${id}`, { method: 'DELETE' }); setNotifKategori(`✅ Kategori "${nama}" dihapus!`); loadData(); setTimeout(() => setNotifKategori(''), 4000); }
+    });
+  };
+
+  // ==== HANDLER RESET DATABASE KUSTOM ====
+  const handleFactoryReset = () => {
+    openModal({
+      type: 'prompt',
+      title: 'DANGER ZONE: Cuci Gudang',
+      message: 'PERINGATAN BAHAYA! Tindakan ini akan menghapus SELURUH DATA tanpa sisa untuk kembali ke ID 001. Jika yakin, ketik kata sandi di bawah ini:',
+      placeholder: 'Ketik RESET disini...',
+      expectedText: 'RESET',
+      confirmText: 'Hapus Semua Data',
+      isDanger: true,
+      onConfirm: async () => {
         try {
           const res = await fetch('http://localhost:3000/api/reset-database', { method: 'DELETE' });
           if (res.ok) {
             showNotif('✅ DATABASE BERHASIL DICUCI BERSIH! Aplikasi kembali seperti baru. ID mulai dari 001.');
             loadData();
           }
-        } catch (error) { alert('Gagal mereset database. Pastikan server nyala.'); }
-      } else if (kataSandi !== null) {
-        alert('Reset dibatalkan. Kata kunci salah.');
+        } catch (error) { showNotif('❌ Gagal mereset database. Pastikan server menyala.'); }
       }
-    }
+    });
   };
 
 
@@ -196,6 +247,48 @@ export default function App() {
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-800 print:bg-white print:h-auto relative">
       
+      {/* ===== POPUP ALERT & CONFIRM KEREN ===== */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 print:hidden transition-opacity">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-100 transition-transform">
+            <div className={`p-5 flex items-center gap-3 text-white ${modal.isDanger ? 'bg-rose-600' : activeTheme.bgSide}`}>
+              <span className="text-2xl">{modal.isDanger ? '⚠️' : '🔔'}</span>
+              <h3 className="font-bold text-lg">{modal.title}</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-5 leading-relaxed font-medium">{modal.message}</p>
+              
+              {modal.type === 'prompt' && (
+                <input
+                  type="text"
+                  placeholder={modal.placeholder}
+                  value={modalInput}
+                  onChange={(e) => setModalInput(e.target.value)}
+                  className={`w-full p-4 border-2 rounded-xl focus:outline-none text-center font-bold tracking-widest uppercase transition-colors ${modalInput === modal.expectedText ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 focus:border-blue-500'}`}
+                  autoFocus
+                />
+              )}
+            </div>
+            <div className="p-4 bg-gray-50 border-t flex justify-end gap-3">
+              <button onClick={closeModal} className="px-5 py-2.5 font-bold text-gray-500 hover:bg-gray-200 hover:text-gray-800 rounded-xl transition">Batal</button>
+              <button
+                onClick={() => {
+                  if (modal.type === 'prompt' && modalInput !== modal.expectedText) {
+                    showNotif('❌ Kata sandi tidak cocok! Proses dibatalkan.');
+                    return;
+                  }
+                  modal.onConfirm();
+                  closeModal();
+                }}
+                className={`px-5 py-2.5 font-bold text-white rounded-xl transition shadow-md ${modal.isDanger ? 'bg-rose-600 hover:bg-rose-700' : activeTheme.btn}`}
+              >
+                {modal.confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== MODAL BUKU PANDUAN MANUAL ===== */}
       {showManual && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:hidden">
@@ -238,7 +331,7 @@ export default function App() {
       </aside>
 
       <main className="flex-1 overflow-y-auto print:overflow-visible print:w-full">
-        {/* HEADER DENGAN TOMBOL PANDUAN (?) */}
+        {/* HEADER */}
         <header className="bg-white shadow-sm h-20 flex items-center px-8 sticky top-0 z-10 print:hidden justify-between">
           <h2 className="text-xl font-bold text-gray-700 uppercase">{activeMenu}</h2>
           <div className="flex items-center gap-4">
@@ -248,7 +341,12 @@ export default function App() {
         </header>
 
         <div className="p-8 print:p-0">
-          {notifTable && <div className="mb-6 p-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl shadow-sm print:hidden border border-emerald-200">{notifTable}</div>}
+          {/* NOTIFIKASI GLOBAL YANG LEBIH CANTIK */}
+          {notifTable && (
+            <div className={`mb-6 p-4 font-bold rounded-xl shadow-sm print:hidden border transition-all ${notifTable.includes('❌') ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300'}`}>
+              {notifTable}
+            </div>
+          )}
 
           {/* === DASHBOARD === */}
           {activeMenu === 'dashboard' && (
@@ -278,10 +376,10 @@ export default function App() {
           {activeMenu === 'transparansi' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:block print:w-full">
               <div className="lg:col-span-1 print:hidden">
-                <FormTransaksi theme={activeTheme} editData={editTxData} onCancelEdit={() => setEditTxData(null)} onSuccess={(aksi) => { showNotif(`Transaksi manual berhasil ${aksi}!`); setEditTxData(null); loadData(); }} picList={safePicList} kategoriList={safeKategoriList} />
+                <FormTransaksi theme={activeTheme} editData={editTxData} onCancelEdit={() => setEditTxData(null)} onSuccess={(aksi) => { showNotif(`✅ Transaksi manual berhasil ${aksi}!`); setEditTxData(null); loadData(); }} picList={safePicList} kategoriList={safeKategoriList} />
               </div>
               <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex flex-col print:shadow-none print:border-0 print:m-0 print:p-0 print:block">
-                <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center print:hidden"><h4 className="font-bold text-gray-700">Riwayat Transaksi Utama</h4><div className="flex gap-2"><button onClick={exportPDF} className="bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold py-2 px-4 rounded-lg">Ekspor PDF</button><button onClick={exportExcel} className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg">Ekspor Excel</button></div></div>
+                <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center print:hidden"><h4 className="font-bold text-gray-700">Riwayat Transaksi Utama</h4><div className="flex gap-2"><button onClick={exportPDF} className="bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold py-2 px-4 rounded-lg shadow-sm">Ekspor PDF</button><button onClick={exportExcel} className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow-sm">Ekspor Excel</button></div></div>
                 <div className="hidden print:block text-center pt-4 pb-6 w-full"><h2 className="text-2xl font-extrabold text-gray-900 uppercase tracking-widest">Laporan Transparansi Dana</h2><h3 className="text-lg font-bold text-gray-700 uppercase">Divisi Danus - INFEST 2026</h3><p className="text-sm text-gray-500 mt-1">Dicetak pada: {formatTanggalDB(new Date().toISOString())}</p><div className="border-b-4 border-gray-900 w-full mt-4 mb-1"></div><div className="border-b-2 border-gray-900 w-full mb-6"></div></div>
                 <div className="flex-1 p-4 print:p-0 overflow-x-auto print:overflow-visible">
                   <table className="w-full text-sm text-left text-gray-600 print:border-collapse print:w-full print:border print:border-gray-800">
@@ -338,7 +436,7 @@ export default function App() {
                   <div className="text-sm text-gray-500 font-bold text-right">Durasi: {hitungDurasiHari(formPp.tanggal_mulai, formPp.tanggal_selesai)} Hari</div>
                   <div><label className="text-sm font-medium mb-1 block">Harga (Rp)</label><input type="number" value={formPp.harga} onChange={(e) => setFormPp({ ...formPp, harga: e.target.value })} required className={`w-full p-2 border rounded-lg ${activeTheme.ring}`} /></div>
                   <div className="flex gap-2">
-                    <button type="submit" className={`flex-1 text-white font-bold py-3 rounded-lg ${ editPpData ? 'bg-orange-500 hover:bg-orange-600' : activeTheme.btn }`}>{editPpData ? 'Update PP' : 'Simpan PP'}</button>
+                    <button type="submit" className={`flex-1 text-white font-bold py-3 rounded-lg shadow-sm ${ editPpData ? 'bg-orange-500 hover:bg-orange-600' : activeTheme.btn }`}>{editPpData ? 'Update PP' : 'Simpan PP'}</button>
                     {editPpData && (<button type="button" onClick={() => { setEditPpData(null); setFormPp({ nama_pemesan: '', tanggal_mulai: '', tanggal_selesai: '', harga: '' }); }} className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-4 rounded-lg">Batal</button>)}
                   </div>
                 </form>
@@ -383,7 +481,7 @@ export default function App() {
                   <div><label className="text-sm font-medium mb-1 block">PJ Pengantar (Manual)</label><input type="text" value={formProp.pj_pengantar} onChange={(e) => setFormProp({ ...formProp, pj_pengantar: e.target.value })} required className={`w-full p-2 border rounded-lg ${activeTheme.ring}`} /></div>
                   <div><label className="text-sm font-medium mb-1 block">Instansi Tujuan</label><input type="text" value={formProp.instansi} onChange={(e) => setFormProp({ ...formProp, instansi: e.target.value })} required className={`w-full p-2 border rounded-lg ${activeTheme.ring}`} /></div>
                   <div className="flex gap-2">
-                    <button type="submit" className={`flex-1 text-white font-bold py-3 rounded-lg ${ editPropData ? 'bg-orange-500 hover:bg-orange-600' : activeTheme.btn }`}>{editPropData ? 'Update Proposal' : 'Simpan Proposal'}</button>
+                    <button type="submit" className={`flex-1 text-white font-bold py-3 rounded-lg shadow-sm ${ editPropData ? 'bg-orange-500 hover:bg-orange-600' : activeTheme.btn }`}>{editPropData ? 'Update Proposal' : 'Simpan Proposal'}</button>
                     {editPropData && (<button type="button" onClick={() => { setEditPropData(null); setFormProp({ pj_pengantar: '', instansi: '', status: 'Menunggu' }); }} className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-4 rounded-lg">Batal</button>)}
                   </div>
                 </form>
@@ -408,7 +506,7 @@ export default function App() {
                             </td>
                             <td className="p-3">
                               {editPropId === pr.id ? (
-                                <div className="flex gap-2 items-center"><input type="number" placeholder="Nominal Rp" value={editPropNominal} onChange={(e) => setEditPropNominal(e.target.value)} className="w-24 p-1 text-xs border rounded-md" /><button onClick={() => updateStatusProp(pr.id, 'Dicairkan', editPropNominal)} className="bg-emerald-500 text-white px-3 py-1 text-xs rounded-md font-bold">OK</button></div>
+                                <div className="flex gap-2 items-center"><input type="number" placeholder="Nominal Rp" value={editPropNominal} onChange={(e) => setEditPropNominal(e.target.value)} className="w-24 p-1 text-xs border rounded-md" /><button onClick={() => updateStatusProp(pr.id, 'Dicairkan', editPropNominal)} className="bg-emerald-500 text-white px-3 py-1 text-xs rounded-md font-bold shadow-sm">OK</button></div>
                               ) : ( <span className="font-bold text-emerald-600">{pr.nominal_cair ? formatRupiah(pr.nominal_cair) : '-'}</span> )}
                             </td>
                             <td className="p-3 text-center whitespace-nowrap">
@@ -429,8 +527,8 @@ export default function App() {
           {activeMenu === 'pengaturan' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:hidden">
               <div className="space-y-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><h3 className="text-lg font-bold text-gray-700 mb-4">Personalisasi Tema Aplikasi</h3><div className="flex gap-4">{Object.keys(THEMES).map((key) => (<button key={key} onClick={() => { setThemeKey(key); localStorage.setItem('sidanus_theme', key); }} className={`flex-1 py-3 px-4 rounded-xl font-bold text-white transition ${THEMES[key].btn} ${themeKey === key ? 'ring-4 ring-offset-2 ring-gray-300' : ''}`}>{THEMES[key].name}</button>))}</div></div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><h3 className="text-lg font-bold text-gray-700 mb-2">Kredensial Login</h3><p className="text-sm text-gray-500 mb-4">Ubah username dan password untuk mengakses SiDanus.</p>{notifCreds && ( <div className="mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-700 text-sm font-semibold">{notifCreds}</div> )}<form onSubmit={handleUpdateCreds} className="space-y-4"><div><label className="block text-sm font-medium mb-1">Username Baru</label><input type="text" value={inputGantiCreds.username} onChange={(e) => setInputGantiCreds({ ...inputGantiCreds, username: e.target.value })} required className={`w-full border-gray-300 rounded-lg p-3 border ${activeTheme.ring}`} /></div><div><label className="block text-sm font-medium mb-1">Password Baru</label><input type="password" value={inputGantiCreds.password} onChange={(e) => setInputGantiCreds({ ...inputGantiCreds, password: e.target.value })} required className={`w-full border-gray-300 rounded-lg p-3 border ${activeTheme.ring}`} /></div><button type="submit" className={`w-full text-white font-bold py-3 rounded-lg ${activeTheme.btn}`}>Simpan Kredensial</button></form></div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><h3 className="text-lg font-bold text-gray-700 mb-4">Personalisasi Tema Aplikasi</h3><div className="flex gap-4">{Object.keys(THEMES).map((key) => (<button key={key} onClick={() => { setThemeKey(key); localStorage.setItem('sidanus_theme', key); }} className={`flex-1 py-3 px-4 rounded-xl font-bold text-white transition shadow-sm ${THEMES[key].btn} ${themeKey === key ? 'ring-4 ring-offset-2 ring-gray-300' : ''}`}>{THEMES[key].name}</button>))}</div></div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><h3 className="text-lg font-bold text-gray-700 mb-2">Kredensial Login</h3><p className="text-sm text-gray-500 mb-4">Ubah username dan password untuk mengakses SiDanus.</p>{notifCreds && ( <div className="mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-700 text-sm font-semibold">{notifCreds}</div> )}<form onSubmit={handleUpdateCreds} className="space-y-4"><div><label className="block text-sm font-medium mb-1">Username Baru</label><input type="text" value={inputGantiCreds.username} onChange={(e) => setInputGantiCreds({ ...inputGantiCreds, username: e.target.value })} required className={`w-full border-gray-300 rounded-lg p-3 border ${activeTheme.ring}`} /></div><div><label className="block text-sm font-medium mb-1">Password Baru</label><input type="password" value={inputGantiCreds.password} onChange={(e) => setInputGantiCreds({ ...inputGantiCreds, password: e.target.value })} required className={`w-full border-gray-300 rounded-lg p-3 border ${activeTheme.ring}`} /></div><button type="submit" className={`w-full text-white font-bold py-3 rounded-lg shadow-sm ${activeTheme.btn}`}>Simpan Kredensial</button></form></div>
               </div>
 
               <div className="space-y-6">
@@ -441,7 +539,7 @@ export default function App() {
                   {notifPj && ( <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-500 text-blue-700 text-sm font-semibold">{notifPj}</div> )}
                   <form onSubmit={handleTambahPj} className="flex gap-4 mb-6">
                     <input type="text" value={namaPjBaru} onChange={(e) => setNamaPjBaru(e.target.value)} placeholder="Nama PJ (cth: Dika)" required className={`flex-1 border-gray-300 rounded-lg p-3 border ${activeTheme.ring}`} />
-                    <button type="submit" className={`text-white font-bold py-3 px-6 rounded-lg ${activeTheme.btn}`}>Tambah</button>
+                    <button type="submit" className={`text-white font-bold py-3 px-6 rounded-lg shadow-sm ${activeTheme.btn}`}>Tambah</button>
                   </form>
                   <div className="border-t pt-4">
                     <h4 className="text-sm font-bold text-gray-600 mb-3">Daftar PJ Aktif:</h4>
@@ -453,14 +551,14 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* MANAJEMEN KATEGORI BARU */}
+                {/* MANAJEMEN KATEGORI */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
                   <h3 className="text-lg font-bold text-gray-700 mb-2">Manajemen Kategori Transaksi</h3>
                   <p className="text-sm text-gray-500 mb-4">Atur dropdown kategori form transaksi utama.</p>
                   {notifKategori && ( <div className="mb-4 p-3 bg-purple-50 border-l-4 border-purple-500 text-purple-700 text-sm font-semibold">{notifKategori}</div> )}
                   <form onSubmit={handleTambahKategori} className="flex gap-4 mb-6">
                     <input type="text" value={namaKategoriBaru} onChange={(e) => setNamaKategoriBaru(e.target.value)} placeholder="Kategori (cth: Konsumsi)" required className={`flex-1 border-gray-300 rounded-lg p-3 border ${activeTheme.ring}`} />
-                    <button type="submit" className={`text-white font-bold py-3 px-6 rounded-lg ${activeTheme.btn}`}>Tambah</button>
+                    <button type="submit" className={`text-white font-bold py-3 px-6 rounded-lg shadow-sm ${activeTheme.btn}`}>Tambah</button>
                   </form>
                   <div className="border-t pt-4">
                     <h4 className="text-sm font-bold text-gray-600 mb-3">Kategori Tersedia:</h4>
