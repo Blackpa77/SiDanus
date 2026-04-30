@@ -51,6 +51,9 @@ export default function App() {
   const [editPropData, setEditPropData] = useState(null);
   const [editPropNominal, setEditPropNominal] = useState('');
 
+  // STATE UNTUK BUKU PANDUAN (MANUAL)
+  const [showManual, setShowManual] = useState(false);
+
   useEffect(() => {
     const interval = setInterval(() => setWaktuLive(new Date()), 1000);
     return () => clearInterval(interval);
@@ -70,11 +73,10 @@ export default function App() {
   const formatTanggalDB = (isoString) => isoString ? new Date(isoString).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
   const showNotif = (msg) => { setNotifTable(msg); setTimeout(() => setNotifTable(''), 3000); };
 
-  // FUNGSI PINTAR UNTUK KATEGORI OTOMATIS
   const getKategoriOtomatis = (tx) => {
     if (tx.kategori?.nama) return tx.kategori.nama;
-    if (tx.keterangan?.toLowerCase().includes('paid promote')) return 'Paid Promote';
-    if (tx.keterangan?.toLowerCase().includes('proposal')) return 'Proposal';
+    if (tx.keterangan?.toLowerCase().includes('paid promote')) return 'Paid Promote (Auto)';
+    if (tx.keterangan?.toLowerCase().includes('proposal')) return 'Proposal (Auto)';
     return '-';
   };
 
@@ -92,6 +94,21 @@ export default function App() {
       else acc.push({ name: cat, value: curr.nominal });
       return acc;
     }, []);
+
+  // FUNGSI CUSTOM LABEL UNTUK PERSENTASE PIE CHART
+  const RADIAN = Math.PI / 180;
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    // Jangan tampilkan label jika persentase kurang dari 3% (biar teks nggak tumpang tindih)
+    if (percent < 0.03) return null; 
+    return (
+      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontWeight="bold" fontSize="14px">
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -166,7 +183,50 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans text-gray-800 print:bg-white print:h-auto">
+    <div className="flex h-screen bg-gray-50 font-sans text-gray-800 print:bg-white print:h-auto relative">
+      
+      {/* ===== MODAL BUKU PANDUAN MANUAL ===== */}
+      {showManual && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:hidden">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col transform transition-all">
+            <div className={`p-6 border-b flex justify-between items-center text-white rounded-t-2xl ${activeTheme.bgSide}`}>
+              <h3 className="text-xl font-bold">📖 Panduan Penggunaan SiDanus</h3>
+              <button onClick={() => setShowManual(false)} className="text-white hover:text-rose-300 font-bold text-2xl leading-none">&times;</button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1 space-y-6 text-gray-700">
+              <section>
+                <h4 className="font-bold text-lg text-gray-900 border-b pb-2 mb-2">1. Sistem Transparansi (Auto-Sync)</h4>
+                <p className="text-sm">SiDanus didesain agar saling terhubung. Jika kamu menginput <strong>Paid Promote</strong> baru atau mengubah status <strong>Proposal</strong> menjadi "Dicairkan", maka uang pemasukan akan <strong>Otomatis Tercatat</strong> di halaman Transparansi. Kamu tidak perlu mengetik manual 2 kali!</p>
+              </section>
+              <section>
+                <h4 className="font-bold text-lg text-gray-900 border-b pb-2 mb-2">2. Mengedit Data & Uang</h4>
+                <p className="text-sm">Jika kamu mengedit harga Paid Promote atau mengedit pencairan Proposal, tenang saja, sistem juga akan secara cerdas <strong>Memperbarui Saldo di Transparansi</strong> secara otomatis mengikuti data yang baru.</p>
+              </section>
+              <section>
+                <h4 className="font-bold text-lg text-gray-900 border-b pb-2 mb-2">3. Menu Pengaturan Master Data</h4>
+                <p className="text-sm">Sebelum memakai menu utama, disarankan untuk masuk ke <strong>Pengaturan</strong> terlebih dahulu. Daftarkan nama anak-anak divisi Danus ke form <em>Penanggung Jawab (PJ)</em>, dan buat <em>Kategori Pengeluaran/Pemasukan</em>. Data ini nantinya akan muncul di Dropdown Form Transaksi.</p>
+              </section>
+              
+              {/* PANDUAN RESET DATABASE */}
+              <section className="bg-rose-50 border border-rose-200 p-5 rounded-xl">
+                <h4 className="font-extrabold text-lg text-rose-700 mb-2 flex items-center gap-2">⚠️ Cara Reset Database (Kembali ke ID 001)</h4>
+                <p className="text-sm mb-3">Jika masa <i>testing</i> aplikasi sudah selesai dan kamu ingin menghapus semua kuitansi agar nomor ID (TRX, PROP, PP) bersih kembali ke 001 untuk digunakan pada hari-H INFEST, ikuti 5 langkah pasti ini:</p>
+                <ol className="list-decimal pl-5 text-sm space-y-2 font-medium text-rose-900">
+                  <li>Kembali ke terminal tempat kamu menjalankan SiDanus, tekan <kbd className="bg-gray-200 px-1 rounded border">Ctrl + C</kbd> untuk mematikan server.</li>
+                  <li>Buka aplikasi VS Code (atau File Explorer komputer).</li>
+                  <li>Cari folder <code className="bg-white px-1 border rounded text-rose-600">apps/backend/prisma/</code>, lalu <strong>HAPUS file bernama <code className="bg-white px-1 border rounded text-rose-600">dev.db</code></strong>. (Ini adalah jantung databasenya).</li>
+                  <li>Di terminal tadi (pastikan posisinya di <code className="bg-white px-1 border rounded">C:\repo\SiDanus&gt;</code>), ketik perintah sakti ini lalu Enter:<br/>
+                      <code className="bg-black text-green-400 p-2 block mt-1 rounded-lg">bunx prisma db push --schema=apps/backend/prisma/schema.prisma</code>
+                  </li>
+                  <li>Setelah sukses, nyalakan kembali servernya dengan <code className="bg-black text-green-400 px-1 rounded">bun run dev</code>. SiDanus akan bersih seperti baru lahir!</li>
+                </ol>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SIDEBAR */}
       <aside className={`w-64 text-white flex flex-col shadow-xl z-10 print:hidden ${activeTheme.bgSide} transition-colors duration-500`}>
         <div className={`h-20 flex items-center justify-center border-b ${activeTheme.border}`}><h1 className="text-2xl font-bold tracking-wider">Si<span className={activeTheme.textAccent}>Danus</span></h1></div>
         <nav className="flex-1 px-4 py-6 space-y-2">
@@ -178,7 +238,15 @@ export default function App() {
       </aside>
 
       <main className="flex-1 overflow-y-auto print:overflow-visible print:w-full">
-        <header className="bg-white shadow-sm h-20 flex items-center px-8 sticky top-0 z-10 print:hidden justify-between"><h2 className="text-xl font-bold text-gray-700 uppercase">{activeMenu}</h2><div className="font-bold text-gray-500 uppercase">Divisi Danus INFEST</div></header>
+        {/* HEADER DENGAN TOMBOL PANDUAN (?) */}
+        <header className="bg-white shadow-sm h-20 flex items-center px-8 sticky top-0 z-10 print:hidden justify-between">
+          <h2 className="text-xl font-bold text-gray-700 uppercase">{activeMenu}</h2>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setShowManual(true)} className="bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors h-10 w-10 rounded-full font-extrabold text-xl flex items-center justify-center shadow-sm" title="Panduan Penggunaan">?</button>
+            <div className="font-bold text-gray-500 uppercase border-l-2 pl-4">Divisi Danus INFEST</div>
+          </div>
+        </header>
+
         <div className="p-8 print:p-0">
           {notifTable && <div className="mb-6 p-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl text-center shadow-sm print:hidden border border-emerald-200">{notifTable}</div>}
 
@@ -193,7 +261,16 @@ export default function App() {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                 <div className="bg-white p-6 rounded-2xl shadow-sm h-96 border border-gray-100 flex flex-col"><h4 className="font-bold text-gray-700 mb-4">Grafik Arus Kas (Pemasukan vs Pengeluaran)</h4><ResponsiveContainer width="100%" height="100%"><BarChart data={dataBar} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis tickFormatter={(value) => `Rp${value / 1000}k`} /><RechartsTooltip formatter={(value) => formatRupiah(value)} /><Legend /><Bar dataKey="Pemasukan" fill="#10b981" radius={[4, 4, 0, 0]} /><Bar dataKey="Pengeluaran" fill="#f43f5e" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm h-96 border border-gray-100 flex flex-col"><h4 className="font-bold text-gray-700 mb-4">Persentase Pengeluaran per Kategori</h4>{dataPie.length === 0 ? (<div className="flex-1 flex items-center justify-center text-gray-400 font-medium">Belum ada data pengeluaran</div>) : (<ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={dataPie} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill="#8884d8" dataKey="value">{dataPie.map((entry, index) => (<Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />))}</Pie><RechartsTooltip formatter={(value) => formatRupiah(value)} /><Legend /></PieChart></ResponsiveContainer>)}</div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm h-96 border border-gray-100 flex flex-col"><h4 className="font-bold text-gray-700 mb-4">Persentase Pengeluaran per Kategori</h4>{dataPie.length === 0 ? (<div className="flex-1 flex items-center justify-center text-gray-400 font-medium">Belum ada data pengeluaran</div>) : (<ResponsiveContainer width="100%" height="100%">
+                    {/* PIE CHART DENGAN CUSTOM LABEL PERSENTASE */}
+                    <PieChart>
+                      <Pie data={dataPie} cx="50%" cy="50%" labelLine={false} label={renderCustomizedLabel} outerRadius={120} fill="#8884d8" dataKey="value">
+                        {dataPie.map((entry, index) => (<Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />))}
+                      </Pie>
+                      <RechartsTooltip formatter={(value) => formatRupiah(value)} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>)}</div>
               </div>
             </div>
           )}
@@ -202,7 +279,6 @@ export default function App() {
           {activeMenu === 'transparansi' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:block print:w-full">
               <div className="lg:col-span-1 print:hidden">
-                {/* DISINI KITA PASSING DATANYA KE FORM BIAR DROPDOWN NYALA! */}
                 <FormTransaksi theme={activeTheme} editData={editTxData} onCancelEdit={() => setEditTxData(null)} onSuccess={(aksi) => { showNotif(`Transaksi manual berhasil ${aksi}!`); setEditTxData(null); loadData(); }} picList={safePicList} kategoriList={safeKategoriList} />
               </div>
               <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex flex-col print:shadow-none print:border-0 print:m-0 print:p-0 print:block">
@@ -289,7 +365,7 @@ export default function App() {
               <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm h-fit border border-gray-100">
                 <h3 className="text-lg font-bold mb-4">{editPropData ? 'Edit Data Proposal' : 'Input Proposal'}</h3>
                 <form onSubmit={submitProp} className="space-y-4">
-                  <div><label className="text-sm font-medium mb-1 block">PJ Pengantar</label><input type="text" value={formProp.pj_pengantar} onChange={(e) => setFormProp({ ...formProp, pj_pengantar: e.target.value })} required className={`w-full p-2 border rounded-lg ${activeTheme.ring}`} /></div>
+                  <div><label className="text-sm font-medium mb-1 block">PJ Pengantar (Manual)</label><input type="text" value={formProp.pj_pengantar} onChange={(e) => setFormProp({ ...formProp, pj_pengantar: e.target.value })} required className={`w-full p-2 border rounded-lg ${activeTheme.ring}`} /></div>
                   <div><label className="text-sm font-medium mb-1 block">Instansi Tujuan</label><input type="text" value={formProp.instansi} onChange={(e) => setFormProp({ ...formProp, instansi: e.target.value })} required className={`w-full p-2 border rounded-lg ${activeTheme.ring}`} /></div>
                   <div className="flex gap-2">
                     <button type="submit" className={`flex-1 text-white font-bold py-3 rounded-lg ${ editPropData ? 'bg-orange-500 hover:bg-orange-600' : activeTheme.btn }`}>{editPropData ? 'Update Proposal' : 'Simpan Proposal'}</button>
