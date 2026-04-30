@@ -24,6 +24,7 @@ const app = new Elysia()
   .post("/api/pic", async ({ body }: { body: any }) => await prisma.penanggungJawab.create({ data: { nama: body.nama } }))
   .delete("/api/pic/:id", async ({ params }) => { await prisma.penanggungJawab.delete({ where: { id: parseInt(params.id) }}); return {success: true}; })
 
+  // ==== TRANSAKSI CRUD ====
   .post("/api/transaksi", async ({ body }: { body: any }) => await prisma.transaksi.create({ data: { tanggal: new Date(body.tanggal), tipe: body.tipe, nominal: parseFloat(body.nominal), keterangan: body.keterangan, id_kategori: parseInt(body.id_kategori), id_pj: parseInt(body.id_pj), bukti_url: body.bukti_url || null } }))
   .put("/api/transaksi/:id", async ({ params, body }: { params: any, body: any }) => await prisma.transaksi.update({ where: { id: parseInt(params.id) }, data: { tanggal: new Date(body.tanggal), tipe: body.tipe, nominal: parseFloat(body.nominal), keterangan: body.keterangan, id_kategori: parseInt(body.id_kategori), id_pj: parseInt(body.id_pj), bukti_url: body.bukti_url || null } }))
   .delete("/api/transaksi/:id", async ({ params }) => { await prisma.transaksi.delete({ where: { id: parseInt(params.id) } }); return { success: true }; })
@@ -65,7 +66,6 @@ const app = new Elysia()
     let txId = current?.transaksi_id;
 
     if (body.status === 'Dicairkan' && body.nominal_cair && !txId) {
-        // FIX UNDEFINED: Ngambil nama instansi langsung dari database
         const tx = await prisma.transaksi.create({ data: { tanggal: new Date(), tipe: 'KREDIT', nominal: parseFloat(body.nominal_cair), keterangan: `Pencairan Proposal: ${current?.instansi}` } });
         txId = tx.id;
     }
@@ -86,6 +86,25 @@ const app = new Elysia()
     return { success: true };
   })
 
+  // ==== RESET DATABASE (FACTORY RESET) ====
+  .delete("/api/reset-database", async () => {
+    try {
+      // 1. Hapus semua isi dari setiap tabel
+      await prisma.transaksi.deleteMany();
+      await prisma.paidPromote.deleteMany();
+      await prisma.proposal.deleteMany();
+      await prisma.kategori.deleteMany();
+      await prisma.penanggungJawab.deleteMany();
+
+      // 2. Trik rahasia SQLite: Hapus memori auto-increment biar ID balik ke 1
+      await prisma.$executeRawUnsafe(`DELETE FROM sqlite_sequence;`);
+
+      return { success: true, message: "Database berhasil dicuci bersih!" };
+    } catch (error) {
+      return { success: false, error: "Gagal mereset database." };
+    }
+  })
+
   .listen(3000);
 
-console.log(`🦊 Backend SiDanus V5 (Fix Undefined & Kategori) Jalan!`);
+console.log(`🦊 Backend SiDanus V6 (Fitur Factory Reset) Jalan!`);

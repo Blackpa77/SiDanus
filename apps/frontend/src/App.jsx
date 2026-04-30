@@ -27,7 +27,6 @@ export default function App() {
   const [stats, setStats] = useState({ total_kredit: 0, total_debit: 0, saldo_saat_ini: 0 });
   const [transaksi, setTransaksi] = useState([]);
   
-  // STATES DATA MASTER
   const [picList, setPicList] = useState([]);
   const [namaPjBaru, setNamaPjBaru] = useState('');
   const [kategoriList, setKategoriList] = useState([]);
@@ -51,7 +50,6 @@ export default function App() {
   const [editPropData, setEditPropData] = useState(null);
   const [editPropNominal, setEditPropNominal] = useState('');
 
-  // STATE UNTUK BUKU PANDUAN (MANUAL)
   const [showManual, setShowManual] = useState(false);
 
   useEffect(() => {
@@ -71,7 +69,7 @@ export default function App() {
 
   const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   const formatTanggalDB = (isoString) => isoString ? new Date(isoString).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
-  const showNotif = (msg) => { setNotifTable(msg); setTimeout(() => setNotifTable(''), 3000); };
+  const showNotif = (msg) => { setNotifTable(msg); window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => setNotifTable(''), 5000); };
 
   const getKategoriOtomatis = (tx) => {
     if (tx.kategori?.nama) return tx.kategori.nama;
@@ -95,19 +93,13 @@ export default function App() {
       return acc;
     }, []);
 
-  // FUNGSI CUSTOM LABEL UNTUK PERSENTASE PIE CHART
   const RADIAN = Math.PI / 180;
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    // Jangan tampilkan label jika persentase kurang dari 3% (biar teks nggak tumpang tindih)
     if (percent < 0.03) return null; 
-    return (
-      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontWeight="bold" fontSize="14px">
-        {`${(percent * 100).toFixed(0)}%`}
-      </text>
-    );
+    return ( <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontWeight="bold" fontSize="14px">{`${(percent * 100).toFixed(0)}%`}</text> );
   };
 
   const handleLogin = (e) => {
@@ -119,11 +111,12 @@ export default function App() {
 
   // ==== HANDLERS TRANSPARANSI ====
   const exportExcel = () => {
-    const headers = ['ID', 'Tanggal', 'Tipe', 'Kategori', 'PJ', 'Keterangan', 'Nominal'];
+    const headers = ['ID', 'Tanggal', 'Tipe', 'Keterangan', 'Kategori', 'PJ', 'Nominal'];
     const rows = [headers.join(',')];
     safeTransaksi.forEach((t) => {
       const idStr = `TRX-${t.id.toString().padStart(4, '0')}`;
-      rows.push([idStr, t.tanggal.split('T')[0], t.tipe, getKategoriOtomatis(t), t.pj?.nama || '-', `"${t.keterangan || ''}"`, t.nominal].join(','));
+      const tipeStr = t.tipe === 'KREDIT' ? 'Pemasukan' : 'Pengeluaran';
+      rows.push([idStr, t.tanggal.split('T')[0], tipeStr, `"${t.keterangan || ''}"`, getKategoriOtomatis(t), t.pj?.nama || '-', t.nominal].join(','));
     });
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -132,7 +125,7 @@ export default function App() {
   const exportPDF = () => window.print();
   const handleHapusTx = async (id) => { if (window.confirm('Yakin ingin menghapus transaksi ini?')) { await fetch(`http://localhost:3000/api/transaksi/${id}`, { method: 'DELETE' }); showNotif('Data transaksi berhasil dihapus!'); loadData(); } };
 
-  // ==== HANDLERS PAID PROMOTE ====
+  // ==== HANDLERS PAID PROMOTE & PROPOSAL ====
   const hitungDurasiHari = (start, end) => { if (!start || !end) return 0; return Math.max(0, Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24))); };
   const submitPp = async (e) => {
     e.preventDefault();
@@ -144,7 +137,6 @@ export default function App() {
   const batalPp = async (id) => { if (window.confirm('Batalkan PP ini? Saldo Transparansi akan ditarik kembali.')) { await fetch(`http://localhost:3000/api/paid-promote/${id}/batal`, { method: 'PUT' }); showNotif('Paid Promote dibatalkan!'); loadData(); } };
   const hapusPp = async (id) => { if (window.confirm('Yakin ingin menghapus Paid Promote ini permanen? Data Transparansi terkait juga akan terhapus.')) { await fetch(`http://localhost:3000/api/paid-promote/${id}`, { method: 'DELETE' }); showNotif('Paid Promote berhasil dihapus!'); loadData(); } };
 
-  // ==== HANDLERS PROPOSAL ====
   const submitProp = async (e) => {
     e.preventDefault();
     if (editPropData) { await fetch(`http://localhost:3000/api/proposal/${editPropData.id}/edit`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formProp) }); showNotif('Data Proposal berhasil diupdate!'); } 
@@ -164,6 +156,25 @@ export default function App() {
   const handleHapusPj = async (id, nama) => { if (window.confirm(`Yakin mau menghapus PJ "${nama}"?`)) { await fetch(`http://localhost:3000/api/pic/${id}`, { method: 'DELETE' }); setNotifPj(`PJ "${nama}" dihapus!`); loadData(); setTimeout(() => setNotifPj(''), 4000); } };
   const handleTambahKategori = async (e) => { e.preventDefault(); try { const res = await fetch('http://localhost:3000/api/kategori', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nama: namaKategoriBaru }) }); if (res.ok) { setNotifKategori(`Kategori sukses ditambahkan!`); setNamaKategoriBaru(''); loadData(); setTimeout(() => setNotifKategori(''), 4000); } } catch (err) { setNotifKategori('Gagal nyimpan Kategori!'); } };
   const handleHapusKategori = async (id, nama) => { if (window.confirm(`Yakin mau menghapus Kategori "${nama}"?`)) { await fetch(`http://localhost:3000/api/kategori/${id}`, { method: 'DELETE' }); setNotifKategori(`Kategori "${nama}" dihapus!`); loadData(); setTimeout(() => setNotifKategori(''), 4000); } };
+
+  // ==== HANDLER RESET DATABASE (DANGER ZONE) ====
+  const handleFactoryReset = async () => {
+    const yakin = window.confirm("PERINGATAN BAHAYA!\n\nApakah kamu yakin ingin MENGHAPUS SEMUA DATA (Transaksi, Paid Promote, Proposal, PJ, Kategori)? Data yang dihapus tidak bisa dikembalikan!");
+    if (yakin) {
+      const kataSandi = window.prompt("Ketik kata sandi 'RESET' (huruf besar semua) untuk konfirmasi penghapusan seluruh database secara permanen:");
+      if (kataSandi === 'RESET') {
+        try {
+          const res = await fetch('http://localhost:3000/api/reset-database', { method: 'DELETE' });
+          if (res.ok) {
+            showNotif('✅ DATABASE BERHASIL DICUCI BERSIH! Aplikasi kembali seperti baru. ID mulai dari 001.');
+            loadData();
+          }
+        } catch (error) { alert('Gagal mereset database. Pastikan server nyala.'); }
+      } else if (kataSandi !== null) {
+        alert('Reset dibatalkan. Kata kunci salah.');
+      }
+    }
+  };
 
 
   if (!isLoggedIn) {
@@ -206,20 +217,9 @@ export default function App() {
                 <h4 className="font-bold text-lg text-gray-900 border-b pb-2 mb-2">3. Menu Pengaturan Master Data</h4>
                 <p className="text-sm">Sebelum memakai menu utama, disarankan untuk masuk ke <strong>Pengaturan</strong> terlebih dahulu. Daftarkan nama anak-anak divisi Danus ke form <em>Penanggung Jawab (PJ)</em>, dan buat <em>Kategori Pengeluaran/Pemasukan</em>. Data ini nantinya akan muncul di Dropdown Form Transaksi.</p>
               </section>
-              
-              {/* PANDUAN RESET DATABASE */}
               <section className="bg-rose-50 border border-rose-200 p-5 rounded-xl">
-                <h4 className="font-extrabold text-lg text-rose-700 mb-2 flex items-center gap-2">⚠️ Cara Reset Database (Kembali ke ID 001)</h4>
-                <p className="text-sm mb-3">Jika masa <i>testing</i> aplikasi sudah selesai dan kamu ingin menghapus semua kuitansi agar nomor ID (TRX, PROP, PP) bersih kembali ke 001 untuk digunakan pada hari-H INFEST, ikuti 5 langkah pasti ini:</p>
-                <ol className="list-decimal pl-5 text-sm space-y-2 font-medium text-rose-900">
-                  <li>Kembali ke terminal tempat kamu menjalankan SiDanus, tekan <kbd className="bg-gray-200 px-1 rounded border">Ctrl + C</kbd> untuk mematikan server.</li>
-                  <li>Buka aplikasi VS Code (atau File Explorer komputer).</li>
-                  <li>Cari folder <code className="bg-white px-1 border rounded text-rose-600">apps/backend/prisma/</code>, lalu <strong>HAPUS file bernama <code className="bg-white px-1 border rounded text-rose-600">dev.db</code></strong>. (Ini adalah jantung databasenya).</li>
-                  <li>Di terminal tadi (pastikan posisinya di <code className="bg-white px-1 border rounded">C:\repo\SiDanus&gt;</code>), ketik perintah sakti ini lalu Enter:<br/>
-                      <code className="bg-black text-green-400 p-2 block mt-1 rounded-lg">bunx prisma db push --schema=apps/backend/prisma/schema.prisma</code>
-                  </li>
-                  <li>Setelah sukses, nyalakan kembali servernya dengan <code className="bg-black text-green-400 px-1 rounded">bun run dev</code>. SiDanus akan bersih seperti baru lahir!</li>
-                </ol>
+                <h4 className="font-extrabold text-lg text-rose-700 mb-2 flex items-center gap-2">⚠️ Cara Cuci Gudang / Reset Database</h4>
+                <p className="text-sm mb-3">Jika masa <i>testing</i> aplikasi sudah selesai dan kamu ingin menghapus semua kuitansi agar nomor ID (TRX, PROP, PP) bersih kembali ke 001 untuk digunakan pada hari-H INFEST, cukup masuk ke menu <b>Pengaturan</b>, lalu cari tombol merah <b>"Hapus Semua Data & Kembalikan ke Awal (001)"</b> di bagian paling bawah. Masukkan kata sandi rahasia "RESET", dan SiDanus akan bersih seperti baru lahir!</p>
               </section>
             </div>
           </div>
@@ -248,7 +248,7 @@ export default function App() {
         </header>
 
         <div className="p-8 print:p-0">
-          {notifTable && <div className="mb-6 p-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl text-center shadow-sm print:hidden border border-emerald-200">{notifTable}</div>}
+          {notifTable && <div className="mb-6 p-4 bg-emerald-100 text-emerald-800 font-bold rounded-xl shadow-sm print:hidden border border-emerald-200">{notifTable}</div>}
 
           {/* === DASHBOARD === */}
           {activeMenu === 'dashboard' && (
@@ -262,7 +262,6 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                 <div className="bg-white p-6 rounded-2xl shadow-sm h-96 border border-gray-100 flex flex-col"><h4 className="font-bold text-gray-700 mb-4">Grafik Arus Kas (Pemasukan vs Pengeluaran)</h4><ResponsiveContainer width="100%" height="100%"><BarChart data={dataBar} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis tickFormatter={(value) => `Rp${value / 1000}k`} /><RechartsTooltip formatter={(value) => formatRupiah(value)} /><Legend /><Bar dataKey="Pemasukan" fill="#10b981" radius={[4, 4, 0, 0]} /><Bar dataKey="Pengeluaran" fill="#f43f5e" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm h-96 border border-gray-100 flex flex-col"><h4 className="font-bold text-gray-700 mb-4">Persentase Pengeluaran per Kategori</h4>{dataPie.length === 0 ? (<div className="flex-1 flex items-center justify-center text-gray-400 font-medium">Belum ada data pengeluaran</div>) : (<ResponsiveContainer width="100%" height="100%">
-                    {/* PIE CHART DENGAN CUSTOM LABEL PERSENTASE */}
                     <PieChart>
                       <Pie data={dataPie} cx="50%" cy="50%" labelLine={false} label={renderCustomizedLabel} outerRadius={120} fill="#8884d8" dataKey="value">
                         {dataPie.map((entry, index) => (<Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />))}
@@ -286,13 +285,25 @@ export default function App() {
                 <div className="hidden print:block text-center pt-4 pb-6 w-full"><h2 className="text-2xl font-extrabold text-gray-900 uppercase tracking-widest">Laporan Transparansi Dana</h2><h3 className="text-lg font-bold text-gray-700 uppercase">Divisi Danus - INFEST 2026</h3><p className="text-sm text-gray-500 mt-1">Dicetak pada: {formatTanggalDB(new Date().toISOString())}</p><div className="border-b-4 border-gray-900 w-full mt-4 mb-1"></div><div className="border-b-2 border-gray-900 w-full mb-6"></div></div>
                 <div className="flex-1 p-4 print:p-0 overflow-x-auto print:overflow-visible">
                   <table className="w-full text-sm text-left text-gray-600 print:border-collapse print:w-full print:border print:border-gray-800">
-                    <thead className="text-xs text-gray-700 uppercase bg-gray-100 print:bg-gray-200"><tr><th className="px-4 py-3 print:border print:border-gray-800">ID</th><th className="px-4 py-3 print:border print:border-gray-800">Tanggal</th><th className="px-4 py-3 print:border print:border-gray-800">Keterangan</th><th className="px-4 py-3 print:border print:border-gray-800">Kategori</th><th className="px-4 py-3 print:border print:border-gray-800">PJ</th><th className="px-4 py-3 print:border print:border-gray-800 text-right">Nominal</th><th className="px-4 py-3 text-center print:hidden">Aksi</th></tr></thead>
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-100 print:bg-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 print:border print:border-gray-800">ID</th>
+                        <th className="px-4 py-3 print:border print:border-gray-800">Tanggal</th>
+                        <th className="px-4 py-3 print:border print:border-gray-800">Tipe</th> 
+                        <th className="px-4 py-3 print:border print:border-gray-800">Keterangan</th>
+                        <th className="px-4 py-3 print:border print:border-gray-800">Kategori</th>
+                        <th className="px-4 py-3 print:border print:border-gray-800">PJ</th>
+                        <th className="px-4 py-3 print:border print:border-gray-800 text-right">Nominal</th>
+                        <th className="px-4 py-3 text-center print:hidden">Aksi</th>
+                      </tr>
+                    </thead>
                     <tbody>
-                      {safeTransaksi.length === 0 ? ( <tr><td colSpan="7" className="text-center py-8 print:border print:border-gray-800">Belum ada transaksi</td></tr> ) : (
+                      {safeTransaksi.length === 0 ? ( <tr><td colSpan="8" className="text-center py-8 print:border print:border-gray-800">Belum ada transaksi</td></tr> ) : (
                         safeTransaksi.map((tx) => (
                           <tr key={tx.id} className="border-b hover:bg-gray-50 print:border-b print:border-gray-800">
                             <td className="px-4 py-3 font-mono font-bold text-gray-500 print:border print:border-gray-800">TRX-{tx.id.toString().padStart(4, '0')}</td>
                             <td className="px-4 py-3 whitespace-nowrap print:border print:border-gray-800">{formatTanggalDB(tx.tanggal)}</td>
+                            <td className={`px-4 py-3 font-bold print:border print:border-gray-800 ${tx.tipe === 'KREDIT' ? 'text-emerald-600 print:text-gray-900' : 'text-rose-600 print:text-gray-900'}`}>{tx.tipe === 'KREDIT' ? 'Pemasukan' : 'Pengeluaran'}</td>
                             <td className="px-4 py-3 font-medium text-gray-800 print:border print:border-gray-800">{tx.keterangan || '-'}</td>
                             <td className="px-4 py-3 font-bold text-gray-800 print:border print:border-gray-800">{getKategoriOtomatis(tx)}</td>
                             <td className="px-4 py-3 print:border print:border-gray-800">{tx.pj?.nama || '-'}</td>
@@ -302,7 +313,11 @@ export default function App() {
                         ))
                       )}
                     </tbody>
-                    <tfoot className="hidden print:table-footer-group font-bold text-gray-900 bg-gray-100"><tr><td colSpan="5" className="px-4 py-3 text-right print:border print:border-gray-800">TOTAL PEMASUKAN</td><td className="px-4 py-3 text-right print:border print:border-gray-800">{formatRupiah(stats.total_kredit)}</td></tr><tr><td colSpan="5" className="px-4 py-3 text-right print:border print:border-gray-800">TOTAL PENGELUARAN</td><td className="px-4 py-3 text-right print:border print:border-gray-800">{formatRupiah(stats.total_debit)}</td></tr><tr><td colSpan="5" className="px-4 py-3 text-right print:border print:border-gray-800 uppercase">Saldo Akhir</td><td className="px-4 py-3 text-right print:border print:border-gray-800 text-lg">{formatRupiah(stats.saldo_saat_ini)}</td></tr></tfoot>
+                    <tfoot className="hidden print:table-footer-group font-bold text-gray-900 bg-gray-100">
+                      <tr><td colSpan="6" className="px-4 py-3 text-right print:border print:border-gray-800">TOTAL PEMASUKAN</td><td className="px-4 py-3 text-right print:border print:border-gray-800">{formatRupiah(stats.total_kredit)}</td></tr>
+                      <tr><td colSpan="6" className="px-4 py-3 text-right print:border print:border-gray-800">TOTAL PENGELUARAN</td><td className="px-4 py-3 text-right print:border print:border-gray-800">{formatRupiah(stats.total_debit)}</td></tr>
+                      <tr><td colSpan="6" className="px-4 py-3 text-right print:border print:border-gray-800 uppercase">Saldo Akhir</td><td className="px-4 py-3 text-right print:border print:border-gray-800 text-lg">{formatRupiah(stats.saldo_saat_ini)}</td></tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
@@ -456,8 +471,17 @@ export default function App() {
                     </ul>
                   </div>
                 </div>
-              </div>
 
+                {/* DANGER ZONE: FACTORY RESET */}
+                <div className="bg-rose-50 p-6 rounded-2xl shadow-sm border-2 border-rose-200 h-fit mt-8">
+                  <h3 className="text-xl font-extrabold text-rose-700 mb-2 flex items-center gap-2">⚠️ DANGER ZONE (Zona Berbahaya)</h3>
+                  <p className="text-sm text-rose-800 mb-4 font-medium">Fitur ini digunakan untuk <strong className="bg-rose-200 px-1 rounded">menghapus bersih</strong> seluruh data saat ini (Kuitansi, Proposal, Paid Promote, PJ, Kategori) untuk kembali ke titik awal (ID 001). Biasanya dipakai ketika aplikasi mau di-deploy resmi ke panitia.</p>
+                  <button onClick={handleFactoryReset} className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-4 rounded-xl text-lg shadow-md transition-all hover:scale-[1.02]">
+                    HAPUS SEMUA DATA & KEMBALIKAN KE AWAL (001)
+                  </button>
+                </div>
+
+              </div>
             </div>
           )}
         </div>
