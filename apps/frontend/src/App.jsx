@@ -73,8 +73,8 @@ export default function App() {
   // FUNGSI PINTAR UNTUK KATEGORI OTOMATIS
   const getKategoriOtomatis = (tx) => {
     if (tx.kategori?.nama) return tx.kategori.nama;
-    if (tx.keterangan?.toLowerCase().includes('paid promote')) return 'Paid Promote (Auto)';
-    if (tx.keterangan?.toLowerCase().includes('proposal')) return 'Proposal (Auto)';
+    if (tx.keterangan?.toLowerCase().includes('paid promote')) return 'Paid Promote';
+    if (tx.keterangan?.toLowerCase().includes('proposal')) return 'Proposal';
     return '-';
   };
 
@@ -289,7 +289,7 @@ export default function App() {
               <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm h-fit border border-gray-100">
                 <h3 className="text-lg font-bold mb-4">{editPropData ? 'Edit Data Proposal' : 'Input Proposal'}</h3>
                 <form onSubmit={submitProp} className="space-y-4">
-                  <div><label className="text-sm font-medium mb-1 block">PJ Pengantar (Manual)</label><input type="text" value={formProp.pj_pengantar} onChange={(e) => setFormProp({ ...formProp, pj_pengantar: e.target.value })} required className={`w-full p-2 border rounded-lg ${activeTheme.ring}`} /></div>
+                  <div><label className="text-sm font-medium mb-1 block">PJ Pengantar</label><input type="text" value={formProp.pj_pengantar} onChange={(e) => setFormProp({ ...formProp, pj_pengantar: e.target.value })} required className={`w-full p-2 border rounded-lg ${activeTheme.ring}`} /></div>
                   <div><label className="text-sm font-medium mb-1 block">Instansi Tujuan</label><input type="text" value={formProp.instansi} onChange={(e) => setFormProp({ ...formProp, instansi: e.target.value })} required className={`w-full p-2 border rounded-lg ${activeTheme.ring}`} /></div>
                   <div className="flex gap-2">
                     <button type="submit" className={`flex-1 text-white font-bold py-3 rounded-lg ${ editPropData ? 'bg-orange-500 hover:bg-orange-600' : activeTheme.btn }`}>{editPropData ? 'Update Proposal' : 'Simpan Proposal'}</button>
