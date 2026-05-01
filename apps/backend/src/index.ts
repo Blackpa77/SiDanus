@@ -101,21 +101,17 @@ const app = new Elysia()
     return { success: true };
   })
 
-  // ==== RESET DATABASE ====
+// ==== RESET DATABASE (FACTORY RESET) KHUSUS POSTGRESQL (SUPABASE) ====
   .delete("/api/reset-database", async () => {
     try {
-      await prisma.transaksi.deleteMany();
-      await prisma.paidPromote.deleteMany();
-      await prisma.proposal.deleteMany();
-      await prisma.kategori.deleteMany();
-      await prisma.penanggungJawab.deleteMany();
-      await prisma.$executeRawUnsafe(`DELETE FROM sqlite_sequence;`);
-      return { success: true, message: "Database berhasil dicuci bersih!" };
+      // Perintah sakti PostgreSQL untuk hapus semua data dan reset ID kembali ke 1
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Transaksi", "PaidPromote", "Proposal", "Kategori", "PenanggungJawab" RESTART IDENTITY CASCADE;`);
+      return { success: true, message: "Database Supabase berhasil dicuci bersih!" };
     } catch (error) {
-      return { success: false, error: "Gagal mereset database." };
+      return { success: false, error: "Gagal mereset database Supabase." };
     }
   })
 
   .listen(3000);
 
-console.log(`🦊 Backend SiDanus V7 (SysInfo & Target) Jalan!`);
+console.log(`🦊 Backend SiDanus V7 (Supabase Ready) Jalan!`);
