@@ -1,6 +1,8 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { PrismaClient } from "@prisma/client";
+import { statSync } from "fs";
+import { join } from "path";
 
 const prisma = new PrismaClient();
 
@@ -13,6 +15,19 @@ const app = new Elysia()
     const debit = await prisma.transaksi.aggregate({ _sum: { nominal: true }, where: { tipe: 'DEBIT' } });
     return { total_kredit: kredit._sum.nominal || 0, total_debit: debit._sum.nominal || 0, saldo_saat_ini: (kredit._sum.nominal || 0) - (debit._sum.nominal || 0) };
   })
+  
+  // ==== SYSTEM INFO (STORAGE LIMIT) ====
+  .get("/api/sysinfo", () => {
+    try {
+      const dbPath = join(process.cwd(), 'prisma', 'dev.db');
+      const stats = statSync(dbPath);
+      // Asumsi Limit Server 1 GB = 1073741824 bytes
+      return { size_bytes: stats.size, limit_bytes: 1073741824 }; 
+    } catch(e) {
+      return { size_bytes: 0, limit_bytes: 1073741824 };
+    }
+  })
+
   .get("/api/transaksi", async () => await prisma.transaksi.findMany({ include: { kategori: true, pj: true }, orderBy: { id: 'desc' } }))
   
   // ==== KATEGORI & PIC (PJ) ====
@@ -86,19 +101,15 @@ const app = new Elysia()
     return { success: true };
   })
 
-  // ==== RESET DATABASE (FACTORY RESET) ====
+  // ==== RESET DATABASE ====
   .delete("/api/reset-database", async () => {
     try {
-      // 1. Hapus semua isi dari setiap tabel
       await prisma.transaksi.deleteMany();
       await prisma.paidPromote.deleteMany();
       await prisma.proposal.deleteMany();
       await prisma.kategori.deleteMany();
       await prisma.penanggungJawab.deleteMany();
-
-      // 2. Trik rahasia SQLite: Hapus memori auto-increment biar ID balik ke 1
       await prisma.$executeRawUnsafe(`DELETE FROM sqlite_sequence;`);
-
       return { success: true, message: "Database berhasil dicuci bersih!" };
     } catch (error) {
       return { success: false, error: "Gagal mereset database." };
@@ -107,4 +118,4 @@ const app = new Elysia()
 
   .listen(3000);
 
-console.log(`🦊 Backend SiDanus V6 (Fitur Factory Reset) Jalan!`);
+console.log(`🦊 Backend SiDanus V7 (SysInfo & Target) Jalan!`);
