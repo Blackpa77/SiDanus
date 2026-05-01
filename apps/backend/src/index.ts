@@ -1,8 +1,6 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { PrismaClient } from "@prisma/client";
-import { statSync } from "fs";
-import { join } from "path";
 
 const prisma = new PrismaClient();
 
@@ -16,15 +14,20 @@ const app = new Elysia()
     return { total_kredit: kredit._sum.nominal || 0, total_debit: debit._sum.nominal || 0, saldo_saat_ini: (kredit._sum.nominal || 0) - (debit._sum.nominal || 0) };
   })
   
-  // ==== SYSTEM INFO (STORAGE LIMIT) ====
-  .get("/api/sysinfo", () => {
+  // ==== SYSTEM INFO (STORAGE LIMIT SUPABASE) ====
+  .get("/api/sysinfo", async () => {
     try {
-      const dbPath = join(process.cwd(), 'prisma', 'dev.db');
-      const stats = statSync(dbPath);
-      // Asumsi Limit Server 1 GB = 1073741824 bytes
-      return { size_bytes: stats.size, limit_bytes: 1073741824 }; 
+      // Tanya langsung ke server PostgreSQL Supabase berapa ukuran databasenya
+      const result: any[] = await prisma.$queryRaw`SELECT pg_database_size(current_database()) as size`;
+      
+      // Hasil dari database biasanya BigInt, kita ubah jadi Number biasa
+      const dbSize = Number(result[0].size); 
+      
+      // Limit Supabase Free Tier = 500 MB (524288000 bytes)
+      return { size_bytes: dbSize, limit_bytes: 524288000 }; 
     } catch(e) {
-      return { size_bytes: 0, limit_bytes: 1073741824 };
+      console.log("Gagal baca ukuran DB:", e);
+      return { size_bytes: 0, limit_bytes: 524288000 };
     }
   })
 
@@ -101,10 +104,9 @@ const app = new Elysia()
     return { success: true };
   })
 
-// ==== RESET DATABASE (FACTORY RESET) KHUSUS POSTGRESQL (SUPABASE) ====
+  // ==== RESET DATABASE (FACTORY RESET) KHUSUS POSTGRESQL (SUPABASE) ====
   .delete("/api/reset-database", async () => {
     try {
-      // Perintah sakti PostgreSQL untuk hapus semua data dan reset ID kembali ke 1
       await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Transaksi", "PaidPromote", "Proposal", "Kategori", "PenanggungJawab" RESTART IDENTITY CASCADE;`);
       return { success: true, message: "Database Supabase berhasil dicuci bersih!" };
     } catch (error) {
@@ -114,4 +116,4 @@ const app = new Elysia()
 
   .listen(3000);
 
-console.log(`🦊 Backend SiDanus V7 (Supabase Ready) Jalan!`);
+console.log(`🦊 Backend SiDanus V8 (Supabase Storage Indicator) Jalan!`);

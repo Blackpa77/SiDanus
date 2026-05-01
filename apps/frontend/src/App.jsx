@@ -4,7 +4,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 
-// THEMES DENGAN SUPPORT DARK MODE & 3 TEMA BARU
 const THEMES = {
   emerald: { name: 'Hijau (Emerald)', bgSide: 'bg-emerald-800', border: 'border-emerald-700', btn: 'bg-emerald-600 hover:bg-emerald-700', textAccent: 'text-emerald-300', ring: 'focus:border-emerald-500 focus:ring-emerald-500', grad: 'from-emerald-800 to-emerald-600', bgMain: 'bg-gray-50', bgCard: 'bg-white', textMain: 'text-gray-800', textMuted: 'text-gray-500', borderCard: 'border-gray-100', bgTable: 'bg-gray-100' },
   indigo: { name: 'Biru (Indigo)', bgSide: 'bg-indigo-800', border: 'border-indigo-700', btn: 'bg-indigo-600 hover:bg-indigo-700', textAccent: 'text-indigo-300', ring: 'focus:border-indigo-500 focus:ring-indigo-500', grad: 'from-indigo-800 to-indigo-600', bgMain: 'bg-gray-50', bgCard: 'bg-white', textMain: 'text-gray-800', textMuted: 'text-gray-500', borderCard: 'border-gray-100', bgTable: 'bg-gray-100' },
@@ -30,9 +29,10 @@ export default function App() {
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [stats, setStats] = useState({ total_kredit: 0, total_debit: 0, saldo_saat_ini: 0 });
   const [transaksi, setTransaksi] = useState([]);
-  const [sysInfo, setSysInfo] = useState({ size_bytes: 0, limit_bytes: 1073741824 });
   
-  // STATE TARGET PENDAPATAN
+  // Default fallback 500MB = 524288000 bytes
+  const [sysInfo, setSysInfo] = useState({ size_bytes: 0, limit_bytes: 524288000 });
+  
   const [targetPendapatan, setTargetPendapatan] = useState(() => {
     return parseInt(localStorage.getItem('sidanus_target') || '10000000', 10);
   });
@@ -61,7 +61,6 @@ export default function App() {
   const [editPropData, setEditPropData] = useState(null);
   const [editPropNominal, setEditPropNominal] = useState('');
 
-  // === UI MODALS STATE ===
   const [showManual, setShowManual] = useState(false);
   const [modal, setModal] = useState({ isOpen: false, type: 'confirm', title: '', message: '', placeholder: '', expectedText: '', confirmText: 'OK', isDanger: false, onConfirm: null });
   const [modalInput, setModalInput] = useState('');
@@ -120,7 +119,6 @@ export default function App() {
     return ( <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontWeight="bold" fontSize="14px">{`${(percent * 100).toFixed(0)}%`}</text> );
   };
 
-  // ==== LOGIKA TARGET & STORAGE ====
   const persentaseTarget = targetPendapatan > 0 ? (stats.total_kredit / targetPendapatan) * 100 : 0;
   const bulatTarget = Math.min(100, Math.floor(persentaseTarget));
   let teksTarget = ""; let warnaTarget = "";
@@ -209,7 +207,6 @@ export default function App() {
     });
   };
 
-  // ==== HANDLERS PENGATURAN ====
   const handleUpdateCreds = (e) => { e.preventDefault(); setCredentials(inputGantiCreds); localStorage.setItem('sidanus_creds', JSON.stringify(inputGantiCreds)); setNotifCreds('✅ Kredensial Login berhasil diubah.'); setTimeout(() => setNotifCreds(''), 4000); };
   
   const handleUpdateTarget = (e) => { e.preventDefault(); setTargetPendapatan(inputTarget); localStorage.setItem('sidanus_target', inputTarget.toString()); showNotif('✅ Target Pendapatan berhasil diubah!'); window.scrollTo(0,0); };
@@ -230,7 +227,6 @@ export default function App() {
     });
   };
 
-  // ==== HANDLER RESET DATABASE KUSTOM ====
   const handleFactoryReset = () => {
     openModal({
       type: 'prompt',
@@ -394,10 +390,10 @@ export default function App() {
 
               {/* ===== INDIKATOR DATABASE STORAGE ===== */}
               <div className={`${activeTheme.bgCard} p-5 rounded-2xl shadow-sm border ${activeTheme.borderCard} flex items-center gap-6 transition-colors`}>
-                <div className={`p-4 rounded-xl ${activeTheme.bgMain} ${activeTheme.textMain} text-2xl`}>💾</div>
+                <div className={`p-4 rounded-xl ${activeTheme.bgMain} ${activeTheme.textMain} text-2xl`}>☁️</div>
                 <div className="flex-1">
                   <div className="flex justify-between mb-1">
-                    <h4 className={`font-bold text-sm ${activeTheme.textMain}`}>Penggunaan Kapasitas Database (SQLite)</h4>
+                    <h4 className={`font-bold text-sm ${activeTheme.textMain}`}>Penggunaan Kapasitas Database (Supabase Cloud)</h4>
                     <span className={`text-xs font-bold ${activeTheme.textMuted}`}>{mbUsed} MB / {mbLimit} MB ({persentaseDb.toFixed(4)}%)</span>
                   </div>
                   <div className={`w-full rounded-full h-2 overflow-hidden ${activeTheme.bgMain}`}>
@@ -580,6 +576,7 @@ export default function App() {
               </div>
 
               <div className="space-y-6">
+                {/* MANAJEMEN PJ */}
                 <div className={`${activeTheme.bgCard} p-6 rounded-2xl shadow-sm border ${activeTheme.borderCard} h-fit transition-colors`}>
                   <h3 className={`text-lg font-bold mb-2 ${activeTheme.textMain}`}>Manajemen Penanggung Jawab (PJ)</h3>
                   <p className={`text-sm mb-4 ${activeTheme.textMuted}`}>Tambahkan atau hapus nama PJ.</p>
@@ -598,6 +595,7 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* MANAJEMEN KATEGORI */}
                 <div className={`${activeTheme.bgCard} p-6 rounded-2xl shadow-sm border ${activeTheme.borderCard} h-fit transition-colors`}>
                   <h3 className={`text-lg font-bold mb-2 ${activeTheme.textMain}`}>Manajemen Kategori Transaksi</h3>
                   <p className={`text-sm mb-4 ${activeTheme.textMuted}`}>Atur dropdown kategori form transaksi utama.</p>
