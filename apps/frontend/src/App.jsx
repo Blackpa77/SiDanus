@@ -30,7 +30,6 @@ export default function App() {
   const [stats, setStats] = useState({ total_kredit: 0, total_debit: 0, saldo_saat_ini: 0 });
   const [transaksi, setTransaksi] = useState([]);
   
-  // Default fallback 500MB = 524288000 bytes
   const [sysInfo, setSysInfo] = useState({ size_bytes: 0, limit_bytes: 524288000 });
   
   const [targetPendapatan, setTargetPendapatan] = useState(() => {
@@ -88,10 +87,12 @@ export default function App() {
   const openModal = (config) => { setModal({ ...config, isOpen: true }); setModalInput(''); };
   const closeModal = () => setModal({ ...modal, isOpen: false });
 
+  // BUG FIX SAKTI: Mencegah Layar Putih karena `keterangan` null
   const getKategoriOtomatis = (tx) => {
-    if (tx.kategori?.nama) return tx.kategori.nama;
-    if (tx.keterangan?.toLowerCase().includes('paid promote')) return 'Paid Promote (Auto)';
-    if (tx.keterangan?.toLowerCase().includes('proposal')) return 'Proposal (Auto)';
+    if (tx?.kategori?.nama) return tx.kategori.nama;
+    const ket = tx?.keterangan?.toLowerCase() || ''; // Fallback string kosong, anti crash!
+    if (ket.includes('paid promote')) return 'Paid Promote (Auto)';
+    if (ket.includes('proposal')) return 'Proposal (Auto)';
     return '-';
   };
 
@@ -101,12 +102,12 @@ export default function App() {
   const safePaidPromotes = Array.isArray(paidPromotes) ? paidPromotes : [];
   const safeProposals = Array.isArray(proposals) ? proposals : [];
 
-  const dataBar = [{ name: 'Arus Kas', Pemasukan: stats.total_kredit || 0, Pengeluaran: stats.total_debit || 0 }];
-  const dataPie = safeTransaksi.filter((t) => t.tipe === 'DEBIT').reduce((acc, curr) => {
+  const dataBar = [{ name: 'Arus Kas', Pemasukan: stats?.total_kredit || 0, Pengeluaran: stats?.total_debit || 0 }];
+  const dataPie = safeTransaksi.filter((t) => t?.tipe === 'DEBIT').reduce((acc, curr) => {
       const cat = getKategoriOtomatis(curr);
       const existing = acc.find((item) => item.name === cat);
-      if (existing) existing.value += curr.nominal;
-      else acc.push({ name: cat, value: curr.nominal });
+      if (existing) existing.value += curr?.nominal || 0;
+      else acc.push({ name: cat, value: curr?.nominal || 0 });
       return acc;
     }, []);
 
@@ -119,7 +120,7 @@ export default function App() {
     return ( <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontWeight="bold" fontSize="14px">{`${(percent * 100).toFixed(0)}%`}</text> );
   };
 
-  const persentaseTarget = targetPendapatan > 0 ? (stats.total_kredit / targetPendapatan) * 100 : 0;
+  const persentaseTarget = targetPendapatan > 0 ? ((stats?.total_kredit || 0) / targetPendapatan) * 100 : 0;
   const bulatTarget = Math.min(100, Math.floor(persentaseTarget));
   let teksTarget = ""; let warnaTarget = "";
   if (bulatTarget < 25) { teksTarget = "Wah masih jauh ni dari target 🥲"; warnaTarget = "bg-rose-500 text-rose-500"; }
@@ -128,9 +129,9 @@ export default function App() {
   else if (bulatTarget >= 75 && bulatTarget < 100) { teksTarget = "Dikit lagi tercapai ayo! 🚀"; warnaTarget = "bg-emerald-400 text-emerald-500"; }
   else { teksTarget = "YES, TARGETMU TERCAPAI, SELAMAT LPJ MU AKAN WANGI! 🎉"; warnaTarget = "bg-emerald-600 text-emerald-600"; }
 
-  const mbUsed = (sysInfo.size_bytes / (1024 * 1024)).toFixed(3);
-  const mbLimit = (sysInfo.limit_bytes / (1024 * 1024)).toFixed(0);
-  const persentaseDb = Math.min(100, (sysInfo.size_bytes / sysInfo.limit_bytes) * 100);
+  const mbUsed = ((sysInfo?.size_bytes || 0) / (1024 * 1024)).toFixed(3);
+  const mbLimit = ((sysInfo?.limit_bytes || 524288000) / (1024 * 1024)).toFixed(0);
+  const persentaseDb = Math.min(100, ((sysInfo?.size_bytes || 0) / (sysInfo?.limit_bytes || 524288000)) * 100);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -149,9 +150,9 @@ export default function App() {
     const headers = ['ID', 'Tanggal', 'Tipe', 'Keterangan', 'Kategori', 'PJ', 'Nominal'];
     const rows = [headers.join(',')];
     safeTransaksi.forEach((t) => {
-      const idStr = `TRX-${t.id.toString().padStart(4, '0')}`;
-      const tipeStr = t.tipe === 'KREDIT' ? 'Pemasukan' : 'Pengeluaran';
-      rows.push([idStr, t.tanggal.split('T')[0], tipeStr, `"${t.keterangan || ''}"`, getKategoriOtomatis(t), t.pj?.nama || '-', t.nominal].join(','));
+      const idStr = `TRX-${(t?.id || 0).toString().padStart(4, '0')}`;
+      const tipeStr = t?.tipe === 'KREDIT' ? 'Pemasukan' : 'Pengeluaran';
+      rows.push([idStr, t?.tanggal?.split('T')[0] || '-', tipeStr, `"${t?.keterangan || ''}"`, getKategoriOtomatis(t), t?.pj?.nama || '-', t?.nominal || 0].join(','));
     });
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -166,13 +167,24 @@ export default function App() {
     });
   };
 
+  const hitungDurasiHari = (start, end) => { if (!start || !end) return 0; return Math.max(0, Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24))); };
   const submitPp = async (e) => {
     e.preventDefault();
     if (editPpData) { await fetch(`http://localhost:3000/api/paid-promote/${editPpData.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formPp) }); showNotif('✅ Paid Promote berhasil diupdate!'); } 
     else { await fetch('http://localhost:3000/api/paid-promote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formPp) }); showNotif('✅ Paid Promote disimpan! Dana otomatis masuk ke Transparansi!'); }
     setFormPp({ nama_pemesan: '', tanggal_mulai: '', tanggal_selesai: '', harga: '' }); setEditPpData(null); loadData();
   };
-  const triggerEditPp = (pp) => { setEditPpData(pp); setFormPp({ nama_pemesan: pp.nama_pemesan, tanggal_mulai: pp.tanggal_mulai.split('T')[0], tanggal_selesai: pp.tanggal_selesai.split('T')[0], harga: pp.harga }); };
+  
+  // FIX Edit Error: Handle jika tanggal tidak ada 'T'-nya (Meskipun jarang)
+  const triggerEditPp = (pp) => { 
+    setEditPpData(pp); 
+    setFormPp({ 
+      nama_pemesan: pp?.nama_pemesan || '', 
+      tanggal_mulai: pp?.tanggal_mulai ? String(pp.tanggal_mulai).split('T')[0] : '', 
+      tanggal_selesai: pp?.tanggal_selesai ? String(pp.tanggal_selesai).split('T')[0] : '', 
+      harga: pp?.harga || '' 
+    }); 
+  };
   
   const batalPp = (id) => { 
     openModal({
@@ -194,7 +206,7 @@ export default function App() {
     else { await fetch('http://localhost:3000/api/proposal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formProp) }); showNotif('✅ Proposal berhasil ditambah!'); }
     setFormProp({ pj_pengantar: '', instansi: '', status: 'Menunggu' }); setEditPropData(null); loadData();
   };
-  const triggerEditProp = (pr) => { setEditPropData(pr); setFormProp({ pj_pengantar: pr.pj_pengantar, instansi: pr.instansi, status: pr.status }); };
+  const triggerEditProp = (pr) => { setEditPropData(pr); setFormProp({ pj_pengantar: pr?.pj_pengantar || '', instansi: pr?.instansi || '', status: pr?.status || 'Menunggu' }); };
   const updateStatusProp = async (id, status, nominal) => {
     await fetch(`http://localhost:3000/api/proposal/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, nominal_cair: nominal }) });
     setEditPropId(null); setEditPropNominal(''); showNotif(status === 'Dicairkan' ? '✅ Hore cair! Dana otomatis masuk Transparansi!' : '✅ Status Proposal diupdate!'); loadData();
@@ -208,7 +220,6 @@ export default function App() {
   };
 
   const handleUpdateCreds = (e) => { e.preventDefault(); setCredentials(inputGantiCreds); localStorage.setItem('sidanus_creds', JSON.stringify(inputGantiCreds)); setNotifCreds('✅ Kredensial Login berhasil diubah.'); setTimeout(() => setNotifCreds(''), 4000); };
-  
   const handleUpdateTarget = (e) => { e.preventDefault(); setTargetPendapatan(inputTarget); localStorage.setItem('sidanus_target', inputTarget.toString()); showNotif('✅ Target Pendapatan berhasil diubah!'); window.scrollTo(0,0); };
 
   const handleTambahPj = async (e) => { e.preventDefault(); try { const res = await fetch('http://localhost:3000/api/pic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nama: namaPjBaru }) }); if (res.ok) { setNotifPj(`✅ PJ sukses ditambahkan!`); setNamaPjBaru(''); loadData(); setTimeout(() => setNotifPj(''), 4000); } } catch (err) { setNotifPj('❌ Gagal nyimpan PJ!'); } };
@@ -247,7 +258,6 @@ export default function App() {
       }
     });
   };
-
 
   if (!isLoggedIn) {
     return (
@@ -316,7 +326,7 @@ export default function App() {
               </section>
               <section className="bg-rose-50/10 border border-rose-500/30 p-5 rounded-xl">
                 <h4 className="font-extrabold text-lg text-rose-500 mb-2 flex items-center gap-2">⚠️ Cara Cuci Gudang / Reset Database</h4>
-                <p className={`text-sm mb-3 ${activeTheme.textMuted}`}>Jika masa <i>testing</i> aplikasi sudah selesai dan kamu ingin menghapus semua kuitansi agar nomor ID (TRX, PROP, PP) bersih kembali ke 001 untuk digunakan pada hari-H INFEST, cukup masuk ke menu <b>Pengaturan</b>, lalu cari tombol merah <b>"Hapus Semua Data & Kembalikan ke Awal (001)"</b> di bagian paling bawah. Masukkan kata sandi rahasia "RESET", dan SiDanus akan bersih seperti baru lahir!</p>
+                <p className={`text-sm mb-3 ${activeTheme.textMuted}`}>Jika masa <i>testing</i> aplikasi sudah selesai dan kamu ingin menghapus semua kuitansi agar nomor ID (TRX, PROP, PP) bersih kembali ke 001 untuk digunakan pada hari-H INFEST, cukup masuk ke menu <b>Pengaturan</b>, lalu cari tombol merah <b>"Hapus Semua Data (RESET 001)"</b> di bagian paling bawah. Masukkan kata sandi rahasia "RESET", dan SiDanus akan bersih seperti baru lahir!</p>
               </section>
             </div>
           </div>
@@ -356,9 +366,9 @@ export default function App() {
             <div className="space-y-6 print:hidden">
               <div className={`bg-gradient-to-r text-white p-6 rounded-2xl shadow-md flex justify-between items-center ${activeTheme.grad} transition-colors duration-500`}><div><h3 className="text-sm font-medium mb-1">Waktu Saat Ini</h3><p className="text-xl font-bold">{waktuLive.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', })}</p></div><div className="text-3xl font-mono font-bold bg-black/20 px-6 py-3 rounded-xl shadow-inner tracking-widest">{waktuLive.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', })} WIB</div></div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className={`${activeTheme.bgCard} p-6 rounded-2xl shadow-sm border-l-4 border-blue-500 ${activeTheme.borderCard}`}><p className={`text-sm font-semibold mb-1 ${activeTheme.textMuted}`}>Total Saldo Danus</p><h3 className={`text-3xl font-bold ${activeTheme.textMain}`}>{formatRupiah(stats.saldo_saat_ini)}</h3></div>
-                <div className={`${activeTheme.bgCard} p-6 rounded-2xl shadow-sm border-l-4 border-emerald-500 ${activeTheme.borderCard}`}><p className={`text-sm font-semibold mb-1 ${activeTheme.textMuted}`}>Pemasukan (+)</p><h3 className="text-2xl font-bold text-emerald-500">+{formatRupiah(stats.total_kredit)}</h3></div>
-                <div className={`${activeTheme.bgCard} p-6 rounded-2xl shadow-sm border-l-4 border-rose-500 ${activeTheme.borderCard}`}><p className={`text-sm font-semibold mb-1 ${activeTheme.textMuted}`}>Pengeluaran (-)</p><h3 className="text-2xl font-bold text-rose-500">-{formatRupiah(stats.total_debit)}</h3></div>
+                <div className={`${activeTheme.bgCard} p-6 rounded-2xl shadow-sm border-l-4 border-blue-500 ${activeTheme.borderCard}`}><p className={`text-sm font-semibold mb-1 ${activeTheme.textMuted}`}>Total Saldo Danus</p><h3 className={`text-3xl font-bold ${activeTheme.textMain}`}>{formatRupiah(stats?.saldo_saat_ini || 0)}</h3></div>
+                <div className={`${activeTheme.bgCard} p-6 rounded-2xl shadow-sm border-l-4 border-emerald-500 ${activeTheme.borderCard}`}><p className={`text-sm font-semibold mb-1 ${activeTheme.textMuted}`}>Pemasukan (+)</p><h3 className="text-2xl font-bold text-emerald-500">+{formatRupiah(stats?.total_kredit || 0)}</h3></div>
+                <div className={`${activeTheme.bgCard} p-6 rounded-2xl shadow-sm border-l-4 border-rose-500 ${activeTheme.borderCard}`}><p className={`text-sm font-semibold mb-1 ${activeTheme.textMuted}`}>Pengeluaran (-)</p><h3 className="text-2xl font-bold text-rose-500">-{formatRupiah(stats?.total_debit || 0)}</h3></div>
               </div>
 
               {/* ===== TARGET PENDAPATAN ===== */}
@@ -370,7 +380,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex justify-between items-center mt-3">
-                  <span className={`text-sm font-bold ${activeTheme.textMuted}`}>{formatRupiah(stats.total_kredit)} Terkumpul</span>
+                  <span className={`text-sm font-bold ${activeTheme.textMuted}`}>{formatRupiah(stats?.total_kredit || 0)} Terkumpul</span>
                   <span className={`text-sm font-bold ${warnaTarget.split(' ')[1]}`}>{teksTarget}</span>
                 </div>
               </div>
@@ -431,23 +441,23 @@ export default function App() {
                     <tbody>
                       {safeTransaksi.length === 0 ? ( <tr><td colSpan="8" className={`text-center py-8 print:border print:border-gray-800 ${activeTheme.textMuted}`}>Belum ada transaksi</td></tr> ) : (
                         safeTransaksi.map((tx) => (
-                          <tr key={tx.id} className={`border-b print:border-b print:border-gray-800 hover:${activeTheme.bgMain} ${activeTheme.borderCard}`}>
-                            <td className={`px-4 py-3 font-mono font-bold print:border print:border-gray-800 ${activeTheme.textMuted}`}>TRX-{tx.id.toString().padStart(4, '0')}</td>
-                            <td className="px-4 py-3 whitespace-nowrap print:border print:border-gray-800">{formatTanggalDB(tx.tanggal)}</td>
-                            <td className={`px-4 py-3 font-bold print:border print:border-gray-800 ${tx.tipe === 'KREDIT' ? 'text-emerald-500 print:text-gray-900' : 'text-rose-500 print:text-gray-900'}`}>{tx.tipe === 'KREDIT' ? 'Pemasukan' : 'Pengeluaran'}</td>
-                            <td className="px-4 py-3 font-medium print:border print:border-gray-800">{tx.keterangan || '-'}</td>
+                          <tr key={tx?.id || Math.random()} className={`border-b print:border-b print:border-gray-800 hover:${activeTheme.bgMain} ${activeTheme.borderCard}`}>
+                            <td className={`px-4 py-3 font-mono font-bold print:border print:border-gray-800 ${activeTheme.textMuted}`}>TRX-{tx?.id?.toString().padStart(4, '0') || '0000'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap print:border print:border-gray-800">{formatTanggalDB(tx?.tanggal)}</td>
+                            <td className={`px-4 py-3 font-bold print:border print:border-gray-800 ${tx?.tipe === 'KREDIT' ? 'text-emerald-500 print:text-gray-900' : 'text-rose-500 print:text-gray-900'}`}>{tx?.tipe === 'KREDIT' ? 'Pemasukan' : 'Pengeluaran'}</td>
+                            <td className="px-4 py-3 font-medium print:border print:border-gray-800">{tx?.keterangan || '-'}</td>
                             <td className="px-4 py-3 font-bold print:border print:border-gray-800">{getKategoriOtomatis(tx)}</td>
-                            <td className="px-4 py-3 print:border print:border-gray-800">{tx.pj?.nama || '-'}</td>
-                            <td className={`px-4 py-3 font-bold whitespace-nowrap text-right print:border print:border-gray-800 ${tx.tipe === 'KREDIT' ? 'text-emerald-500 print:text-gray-900' : 'text-rose-500 print:text-gray-900'}`}>{tx.tipe === 'KREDIT' ? '+' : '-'}{formatRupiah(tx.nominal)}</td>
+                            <td className="px-4 py-3 print:border print:border-gray-800">{tx?.pj?.nama || '-'}</td>
+                            <td className={`px-4 py-3 font-bold whitespace-nowrap text-right print:border print:border-gray-800 ${tx?.tipe === 'KREDIT' ? 'text-emerald-500 print:text-gray-900' : 'text-rose-500 print:text-gray-900'}`}>{tx?.tipe === 'KREDIT' ? '+' : '-'}{formatRupiah(tx?.nominal || 0)}</td>
                             <td className="px-4 py-3 text-center print:hidden whitespace-nowrap"><button onClick={() => setEditTxData(tx)} className="text-blue-500 hover:text-blue-400 font-bold mx-2">Edit</button><button onClick={() => handleHapusTx(tx.id)} className="text-rose-500 hover:text-rose-400 font-bold mx-2">Hapus</button></td>
                           </tr>
                         ))
                       )}
                     </tbody>
                     <tfoot className="hidden print:table-footer-group font-bold text-gray-900 bg-gray-100">
-                      <tr><td colSpan="6" className="px-4 py-3 text-right print:border print:border-gray-800">TOTAL PEMASUKAN</td><td className="px-4 py-3 text-right print:border print:border-gray-800">{formatRupiah(stats.total_kredit)}</td></tr>
-                      <tr><td colSpan="6" className="px-4 py-3 text-right print:border print:border-gray-800">TOTAL PENGELUARAN</td><td className="px-4 py-3 text-right print:border print:border-gray-800">{formatRupiah(stats.total_debit)}</td></tr>
-                      <tr><td colSpan="6" className="px-4 py-3 text-right print:border print:border-gray-800 uppercase">Saldo Akhir</td><td className="px-4 py-3 text-right print:border print:border-gray-800 text-lg">{formatRupiah(stats.saldo_saat_ini)}</td></tr>
+                      <tr><td colSpan="6" className="px-4 py-3 text-right print:border print:border-gray-800">TOTAL PEMASUKAN</td><td className="px-4 py-3 text-right print:border print:border-gray-800">{formatRupiah(stats?.total_kredit || 0)}</td></tr>
+                      <tr><td colSpan="6" className="px-4 py-3 text-right print:border print:border-gray-800">TOTAL PENGELUARAN</td><td className="px-4 py-3 text-right print:border print:border-gray-800">{formatRupiah(stats?.total_debit || 0)}</td></tr>
+                      <tr><td colSpan="6" className="px-4 py-3 text-right print:border print:border-gray-800 uppercase">Saldo Akhir</td><td className="px-4 py-3 text-right print:border print:border-gray-800 text-lg">{formatRupiah(stats?.saldo_saat_ini || 0)}</td></tr>
                     </tfoot>
                   </table>
                 </div>
@@ -483,14 +493,16 @@ export default function App() {
                     <tbody>
                       {safePaidPromotes.length === 0 ? ( <tr><td colSpan="6" className={`text-center py-8 ${activeTheme.textMuted}`}>Belum ada PP</td></tr> ) : (
                         safePaidPromotes.map((pp) => {
-                          const isExpired = new Date() > new Date(pp.tanggal_selesai);
-                          const statusVisual = pp.status === 'Dibatalkan' ? 'bg-rose-500/20 text-rose-500' : isExpired ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500';
-                          const statusText = pp.status === 'Dibatalkan' ? 'Dibatalkan' : isExpired ? 'Selesai' : 'Aktif';
+                          const startStr = pp?.tanggal_mulai || '';
+                          const endStr = pp?.tanggal_selesai || '';
+                          const isExpired = new Date() > new Date(endStr);
+                          const statusVisual = pp?.status === 'Dibatalkan' ? 'bg-rose-500/20 text-rose-500' : isExpired ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500';
+                          const statusText = pp?.status === 'Dibatalkan' ? 'Dibatalkan' : isExpired ? 'Selesai' : 'Aktif';
                           return (
-                            <tr key={pp.id} className={`border-b hover:${activeTheme.bgMain} ${activeTheme.borderCard}`}>
-                              <td className={`p-3 font-mono font-bold ${activeTheme.textMuted}`}>PP-{pp.id.toString().padStart(3, '0')}</td><td className="p-3 font-bold">{pp.nama_pemesan}</td><td className="p-3">{hitungDurasiHari(pp.tanggal_mulai, pp.tanggal_selesai)} Hari</td><td className="p-3 font-bold text-emerald-500">{formatRupiah(pp.harga)}</td><td className="p-3"><span className={`px-2 py-1 rounded-md text-xs font-bold ${statusVisual}`}>{statusText}</span></td>
+                            <tr key={pp?.id || Math.random()} className={`border-b hover:${activeTheme.bgMain} ${activeTheme.borderCard}`}>
+                              <td className={`p-3 font-mono font-bold ${activeTheme.textMuted}`}>PP-{(pp?.id || 0).toString().padStart(3, '0')}</td><td className="p-3 font-bold">{pp?.nama_pemesan || '-'}</td><td className="p-3">{hitungDurasiHari(startStr, endStr)} Hari</td><td className="p-3 font-bold text-emerald-500">{formatRupiah(pp?.harga || 0)}</td><td className="p-3"><span className={`px-2 py-1 rounded-md text-xs font-bold ${statusVisual}`}>{statusText}</span></td>
                               <td className="p-3 text-center whitespace-nowrap">
-                                {pp.status !== 'Dibatalkan' && (<button onClick={() => batalPp(pp.id)} className="text-blue-500 hover:text-blue-400 font-bold text-xs hover:underline mx-1">Batalkan</button>)}
+                                {pp?.status !== 'Dibatalkan' && (<button onClick={() => batalPp(pp.id)} className="text-blue-500 hover:text-blue-400 font-bold text-xs hover:underline mx-1">Batalkan</button>)}
                                 <button onClick={() => triggerEditPp(pp)} className="text-orange-500 hover:text-orange-400 text-xs font-bold hover:underline mx-1">Edit</button>
                                 <button onClick={() => hapusPp(pp.id)} className="text-rose-500 hover:text-rose-400 text-xs font-bold hover:underline mx-1">Hapus</button>
                               </td>
@@ -528,22 +540,22 @@ export default function App() {
                     <tbody>
                       {safeProposals.length === 0 ? ( <tr><td colSpan="6" className={`text-center py-8 ${activeTheme.textMuted}`}>Belum ada proposal</td></tr> ) : (
                         safeProposals.map((pr) => (
-                          <tr key={pr.id} className={`border-b hover:${activeTheme.bgMain} ${activeTheme.borderCard}`}>
-                            <td className={`p-3 font-mono font-bold ${activeTheme.textMuted}`}>PROP-{pr.id.toString().padStart(3, '0')}</td><td className="p-3">{pr.pj_pengantar}</td><td className="p-3 font-bold">{pr.instansi}</td>
+                          <tr key={pr?.id || Math.random()} className={`border-b hover:${activeTheme.bgMain} ${activeTheme.borderCard}`}>
+                            <td className={`p-3 font-mono font-bold ${activeTheme.textMuted}`}>PROP-{(pr?.id || 0).toString().padStart(3, '0')}</td><td className="p-3">{pr?.pj_pengantar || '-'}</td><td className="p-3 font-bold">{pr?.instansi || '-'}</td>
                             <td className="p-3">
-                              {editPropId === pr.id ? (
-                                <select value={pr.status} onChange={(e) => { if (e.target.value !== 'Dicairkan') updateStatusProp(pr.id, e.target.value, null); else setEditPropId(pr.id); }} className={`p-2 border rounded-md text-xs font-bold shadow-sm ${activeTheme.bgMain} ${activeTheme.textMain} ${activeTheme.borderCard}`}>
+                              {editPropId === pr?.id ? (
+                                <select value={pr?.status || 'Menunggu'} onChange={(e) => { if (e.target.value !== 'Dicairkan') updateStatusProp(pr.id, e.target.value, null); else setEditPropId(pr.id); }} className={`p-2 border rounded-md text-xs font-bold shadow-sm ${activeTheme.bgMain} ${activeTheme.textMain} ${activeTheme.borderCard}`}>
                                   <option value="Menunggu">Menunggu</option><option value="Diterima">Diterima</option><option value="Ditolak">Ditolak</option><option value="Dicairkan">Dicairkan</option>
                                 </select>
-                              ) : ( <span className={`px-2 py-1 rounded-md text-xs font-bold ${ pr.status === 'Dicairkan' ? 'bg-emerald-500/20 text-emerald-500' : pr.status === 'Ditolak' ? 'bg-rose-500/20 text-rose-500' : 'bg-orange-500/20 text-orange-500' }`}>{pr.status}</span> )}
+                              ) : ( <span className={`px-2 py-1 rounded-md text-xs font-bold ${ pr?.status === 'Dicairkan' ? 'bg-emerald-500/20 text-emerald-500' : pr?.status === 'Ditolak' ? 'bg-rose-500/20 text-rose-500' : 'bg-orange-500/20 text-orange-500' }`}>{pr?.status || '-'}</span> )}
                             </td>
                             <td className="p-3">
-                              {editPropId === pr.id ? (
+                              {editPropId === pr?.id ? (
                                 <div className="flex gap-2 items-center"><input type="number" placeholder="Nominal Rp" value={editPropNominal} onChange={(e) => setEditPropNominal(e.target.value)} className={`w-24 p-1 text-xs border rounded-md ${activeTheme.bgMain} ${activeTheme.textMain} ${activeTheme.borderCard}`} /><button onClick={() => updateStatusProp(pr.id, 'Dicairkan', editPropNominal)} className="bg-emerald-600 text-white px-3 py-1 text-xs rounded-md font-bold shadow-sm">OK</button></div>
-                              ) : ( <span className="font-bold text-emerald-500">{pr.nominal_cair ? formatRupiah(pr.nominal_cair) : '-'}</span> )}
+                              ) : ( <span className="font-bold text-emerald-500">{pr?.nominal_cair ? formatRupiah(pr.nominal_cair) : '-'}</span> )}
                             </td>
                             <td className="p-3 text-center whitespace-nowrap">
-                              {editPropId === pr.id ? ( <button onClick={() => { setEditPropId(null); setEditPropNominal(''); }} className={`text-xs font-bold hover:underline mx-1 ${activeTheme.textMuted}`}>Batal</button> ) : ( pr.status !== 'Dicairkan' && ( <button onClick={() => setEditPropId(pr.id)} className="text-blue-500 hover:text-blue-400 text-xs font-bold hover:underline mx-1">Status</button> ) )}
+                              {editPropId === pr?.id ? ( <button onClick={() => { setEditPropId(null); setEditPropNominal(''); }} className={`text-xs font-bold hover:underline mx-1 ${activeTheme.textMuted}`}>Batal</button> ) : ( pr?.status !== 'Dicairkan' && ( <button onClick={() => setEditPropId(pr.id)} className="text-blue-500 hover:text-blue-400 text-xs font-bold hover:underline mx-1">Status</button> ) )}
                               <button onClick={() => triggerEditProp(pr)} className="text-orange-500 hover:text-orange-400 text-xs font-bold hover:underline mx-1">Edit</button><button onClick={() => hapusProp(pr.id)} className="text-rose-500 hover:text-rose-400 text-xs font-bold hover:underline mx-1">Hapus</button>
                             </td>
                           </tr>
@@ -589,7 +601,7 @@ export default function App() {
                     <h4 className={`text-sm font-bold mb-3 ${activeTheme.textMuted}`}>Daftar PJ Aktif:</h4>
                     <ul className="space-y-2 max-h-48 overflow-y-auto pr-2">
                       {safePicList.map((pj) => (
-                        <li key={pj.id} className={`flex justify-between items-center p-3 rounded-lg border ${activeTheme.bgMain} ${activeTheme.borderCard}`}><span className={`font-medium ${activeTheme.textMain}`}>{pj.nama}</span><button onClick={() => handleHapusPj(pj.id, pj.nama)} className="text-rose-500 hover:text-rose-400 text-sm font-bold px-3 py-1 rounded-md transition">Hapus</button></li>
+                        <li key={pj?.id || Math.random()} className={`flex justify-between items-center p-3 rounded-lg border ${activeTheme.bgMain} ${activeTheme.borderCard}`}><span className={`font-medium ${activeTheme.textMain}`}>{pj?.nama || '-'}</span><button onClick={() => handleHapusPj(pj.id, pj.nama)} className="text-rose-500 hover:text-rose-400 text-sm font-bold px-3 py-1 rounded-md transition">Hapus</button></li>
                       ))}
                     </ul>
                   </div>
@@ -608,7 +620,7 @@ export default function App() {
                     <h4 className={`text-sm font-bold mb-3 ${activeTheme.textMuted}`}>Kategori Tersedia:</h4>
                     <ul className="space-y-2 max-h-48 overflow-y-auto pr-2">
                       {safeKategoriList.map((kat) => (
-                        <li key={kat.id} className={`flex justify-between items-center p-3 rounded-lg border ${activeTheme.bgMain} ${activeTheme.borderCard}`}><span className={`font-medium ${activeTheme.textMain}`}>{kat.nama}</span><button onClick={() => handleHapusKategori(kat.id, kat.nama)} className="text-rose-500 hover:text-rose-400 text-sm font-bold px-3 py-1 rounded-md transition">Hapus</button></li>
+                        <li key={kat?.id || Math.random()} className={`flex justify-between items-center p-3 rounded-lg border ${activeTheme.bgMain} ${activeTheme.borderCard}`}><span className={`font-medium ${activeTheme.textMain}`}>{kat?.nama || '-'}</span><button onClick={() => handleHapusKategori(kat.id, kat.nama)} className="text-rose-500 hover:text-rose-400 text-sm font-bold px-3 py-1 rounded-md transition">Hapus</button></li>
                       ))}
                     </ul>
                   </div>
